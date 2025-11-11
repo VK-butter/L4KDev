@@ -1,0 +1,20 @@
+[
+  {
+    "id": "superset-main",
+    "type": "iframe",
+    "title": "Superset Sales Overview",
+    "description": "Placeholder iframe referencing Superset dashboard served via SSH tunnel.",
+    "placeholderUrl": "https://superset-placeholder.local/dashboard",
+    "status": "placeholder",
+    "integrationNotes": "Replace placeholderUrl with the actual Superset URL once SSH tunnel is available."
+  },
+  {
+    "id": "nocodb-orders",
+    "type": "api",
+    "title": "NocoDB Order Tracker",
+    "description": "Mock API response that simulates the NocoDB chart endpoint.",
+    "placeholderUrl": "/api/analytics/nocodb-placeholder",
+    "status": "placeholder",
+    "integrationNotes": "Swap placeholderUrl with the live NocoDB endpoint and map auth headers."
+  }
+]

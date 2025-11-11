@@ -1,0 +1,14 @@
+{
+  "name": "sale-dashboard-prototype-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --recursive run dev",
+    "build": "pnpm --recursive run build",
+    "lint": "pnpm --recursive run lint",
+    "test": "pnpm --recursive run test",
+    "format": "pnpm --recursive run format",
+    "test:e2e": "pnpm --filter sale-dashboard-frontend run test:e2e"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

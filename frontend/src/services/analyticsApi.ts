@@ -1,0 +1,72 @@
+import type {
+  AnalyticsCategoryBreakdown,
+  AnalyticsDrilldownResponse,
+  AnalyticsSummary,
+  AnalyticsTimeseriesPoint
+} from '@shared/index';
+import { apiClient } from './apiClient';
+
+export interface AnalyticsFilterParams {
+  dateStart: string;
+  dateEnd: string;
+  categories?: string[];
+  statuses?: string[];
+}
+
+type QueryParams = AnalyticsFilterParams & {
+  category?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+function buildQuery(params: QueryParams) {
+  const searchParams = new URLSearchParams();
+  searchParams.set('dateStart', params.dateStart);
+  searchParams.set('dateEnd', params.dateEnd);
+  if (params.categories && params.categories.length > 0) {
+    searchParams.set('categories', params.categories.join(','));
+  }
+  if (params.statuses && params.statuses.length > 0) {
+    searchParams.set('statuses', params.statuses.join(','));
+  }
+  if (typeof params.category === 'string') {
+    searchParams.set('category', params.category);
+  }
+  if (typeof params.status === 'string') {
+    searchParams.set('status', params.status);
+  }
+  if (typeof params.page === 'number') {
+    searchParams.set('page', String(params.page));
+  }
+  if (typeof params.pageSize === 'number') {
+    searchParams.set('pageSize', String(params.pageSize));
+  }
+  return searchParams.toString();
+}
+
+export const analyticsApi = {
+  summary: (params: AnalyticsFilterParams) =>
+    apiClient.get<{ data: AnalyticsSummary }>(
+      `/analytics/orders/summary?${buildQuery(params)}`
+    ),
+  byCategory: (params: AnalyticsFilterParams) =>
+    apiClient.get<{ data: AnalyticsCategoryBreakdown[] }>(
+      `/analytics/orders/by-category?${buildQuery(params)}`
+    ),
+  timeseries: (params: AnalyticsFilterParams) =>
+    apiClient.get<{ data: AnalyticsTimeseriesPoint[] }>(
+      `/analytics/orders/timeseries?${buildQuery(params)}`
+    ),
+  drilldown: (
+    params: AnalyticsFilterParams & {
+      category?: string;
+      status?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ) =>
+    apiClient.get<{ data: AnalyticsDrilldownResponse }>(
+      `/analytics/orders/drilldown?${buildQuery(params)}`
+    )
+};

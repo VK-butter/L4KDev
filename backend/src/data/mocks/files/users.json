@@ -1,0 +1,156 @@
+[
+  {
+    "id": "75defaca-6367-4ecc-be2b-98500cd7a1c8",
+    "username": "autotest+1762836735211@example.com",
+    "displayName": "QA User 1762836735211",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "f2b2038b-7eda-4e2f-8d7d-fa5a96c1a66c",
+    "username": "autotest+1762836309214@example.com",
+    "displayName": "QA User 1762836309214",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "263fdbca-6a33-4637-9112-b350e52f953c",
+    "username": "autotest+1762836275877@example.com",
+    "displayName": "QA User 1762836275877",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "f99c047a-58b8-4f91-9f0c-83153c2df369",
+    "username": "autotest+1762836229621@example.com",
+    "displayName": "QA User 1762836229621",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "baef6283-b195-4f17-a25e-0d4934c94dfb",
+    "username": "autotest+1762836171040@example.com",
+    "displayName": "QA User 1762836171040",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "064378ec-073f-4e97-b9a4-be702ab1c199",
+    "username": "autotest+1762836123513@example.com",
+    "displayName": "QA User 1762836123513",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "55892cd7-88a4-4d6b-896b-b8afb21ef055",
+    "username": "autotest+1762836054008@example.com",
+    "displayName": "QA User 1762836054008",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "1c4192c8-1ac5-48b9-90ac-e35fe240ac10",
+    "username": "autotest+1762836004360@example.com",
+    "displayName": "QA User 1762836004360",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "8ef1b492-e4bb-487b-a2a2-0d47ba36b63d",
+    "username": "autotest+1762835901064@example.com",
+    "displayName": "QA User 1762835901064",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "01d5580b-ffb3-4401-825a-7e6da7032654",
+    "username": "autotest+1762775979687@example.com",
+    "displayName": "QA User 1762775979687",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "fd63efc3-df06-4eb5-b97c-2d9a819c27f0",
+    "username": "autotest+1762774986755@example.com",
+    "displayName": "QA User 1762774986755",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "dd329f41-11c1-441e-9a31-81cc3dc63c35",
+    "username": "autotest+1762774864980@example.com",
+    "displayName": "QA User 1762774864980",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "bd4ab95e-dd1f-4ccc-b8b0-b24da74ddf08",
+    "username": "autotest+1762774835243@example.com",
+    "displayName": "QA User 1762774835243",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "08bd5708-1f1b-4786-a542-0e50f649282b",
+    "username": "autotest+1762773953858@example.com",
+    "displayName": "QA User 1762773953858",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "0d2f6d4c-2d03-444e-8bb1-19971f8ef88b",
+    "username": "autotest+1762773900999@example.com",
+    "displayName": "QA User 1762773900999",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "869ba32d-cdbb-4e3b-9648-f652b53fd641",
+    "username": "autotest+1762773618413@example.com",
+    "displayName": "QA User 1762773618413",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "49215641-53bb-4ce1-bfeb-6cfb7275c49e",
+    "username": "autotest+1762771132719@example.com",
+    "displayName": "QA User 1762771132719",
+    "role": "analyst",
+    "status": "inactive",
+    "passwordHash": "plain:TempPass!123"
+  },
+  {
+    "id": "user-admin-001",
+    "username": "admin@example.com",
+    "displayName": "Demo Admin",
+    "role": "admin",
+    "status": "active",
+    "passwordHash": "plain:Admin!123",
+    "lastLoginAt": null
+  },
+  {
+    "id": "user-analyst-001",
+    "username": "analyst@example.com",
+    "displayName": "Demo Analyst",
+    "role": "analyst",
+    "status": "active",
+    "passwordHash": "plain:Analyst!123",
+    "lastLoginAt": null
+  }
+]

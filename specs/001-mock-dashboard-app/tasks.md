@@ -27,11 +27,11 @@
 - [x] T011 Configure shared router + query clients in `frontend/src/services/apiClient.ts` with Axios defaults pointing to backend proxy.
 - [x] T012 Document environment variables and dev scripts in `specs/001-mock-dashboard-app/quickstart.md` (extend existing instructions with new env keys).
 
-**Checkpoint**: Foundation ready—user story implementation can now begin.
+**Checkpoint**: Foundation readyโ€”user story implementation can now begin.
 
 ---
 
-## Phase 3: User Story 1 - Authenticate into dashboard shell (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Authenticate into dashboard shell (Priority: P1) ๐ฏ MVP
 
 **Goal**: Deliver the green-themed login experience, mock authentication, session persistence, and guarded dashboard shell.
 
@@ -45,7 +45,7 @@
 - [x] T016 [US1] Create `frontend/src/pages/LoginPage.tsx` with form validation, inline errors, and green-themed visuals.
 - [x] T017 [US1] Implement `frontend/src/hooks/useSession.ts` + `frontend/src/routes/ProtectedRoute.tsx` to gate dashboard routes based on role.
 - [x] T018 [US1] Flesh out `frontend/src/components/layout/AppShell.tsx` top nav + sidebar with real content placeholders and user menu (depends on T016, T017).
-- [x] T019 [US1] Document manual test steps for US1 in `specs/001-mock-dashboard-app/quickstart.md` under a new “Auth Verification” section.
+- [x] T019 [US1] Document manual test steps for US1 in `specs/001-mock-dashboard-app/quickstart.md` under a new โ€Auth Verificationโ€ section.
 
 **Checkpoint**: Authenticated shell works end-to-end; analysts can reach dashboard skeleton independently.
 
@@ -75,12 +75,12 @@
 
 **Goal**: Provide KPI cards, interactive charts, filters, and drill-down panels backed by mock sales data and analytics endpoints.
 
-**Independent Test**: With seeded mock data, adjust date range/category/status filters and verify KPIs + charts refresh within 1s; select a chart bar to open drill-down showing matching orders with pagination and “no data” state when filters empty.
+**Independent Test**: With seeded mock data, adjust date range/category/status filters and verify KPIs + charts refresh within 1s; select a chart bar to open drill-down showing matching orders with pagination and โ€no dataโ€ state when filters empty.
 
 ### Implementation & Validation
 
 - [x] T027 [P] [US3] Add Playwright scenario for filter + drill-down coverage in `frontend/tests/e2e/analytics.spec.ts`.
-- [x] T028 [US3] Expand mock data generator (`backend/src/data/mocks/seedOrders.ts`) to produce ≥5k orders with diverse categories/statuses.
+- [x] T028 [US3] Expand mock data generator (`backend/src/data/mocks/seedOrders.ts`) to produce โฅ5k orders with diverse categories/statuses.
 - [x] T029 [US3] Implement analytics querying logic in `backend/src/services/analytics/salesQueryService.ts` (summary, category breakdown, timeseries, drilldown).
 - [x] T030 [US3] Wire analytics API routes (`backend/src/api/analytics/ordersRoutes.ts`) per contracts, including pagination + validation.
 - [x] T031 [US3] Create filter state store + hooks in `frontend/src/hooks/useSalesFilters.ts` with URL sync and default ranges.
@@ -117,25 +117,25 @@
 
 **Purpose**: Finalize documentation, QA scripts, and hardening across stories.
 
-- [ ] T043 Refresh root `README.md` with architecture diagram, workspace commands, and pointers to quickstart/tests.
-- [ ] T044 Add `specs/001-mock-dashboard-app/checklist.md` summarizing manual regression steps per user story.
-- [ ] T045 [P] Run `pnpm lint && pnpm test && pnpm test:e2e` and capture results in `specs/001-mock-dashboard-app/tasks.md` status log.
-- [ ] T046 [P] Perform accessibility + responsiveness pass in `frontend/src/components/` ensuring nav/sidebar/admin UI meet basic WCAG contrast.
-- [ ] T047 Review logging + error handling in `backend/src/middleware/` to ensure embed failures don’t crash core flows.
-- [ ] T048 Validate quickstart instructions end-to-end (fresh clone → pnpm install → seed mocks → dev servers) and update any gaps.
+- [x] T043 Refresh root `README.md` with architecture diagram, workspace commands, and pointers to quickstart/tests.
+- [x] T044 Add `specs/001-mock-dashboard-app/checklist.md` summarizing manual regression steps per user story.
+- [x] T045 [P] Run `pnpm lint && pnpm test && pnpm test:e2e` and capture results in `specs/001-mock-dashboard-app/tasks.md` status log.
+- [x] T046 [P] Perform accessibility + responsiveness pass in `frontend/src/components/` ensuring nav/sidebar/admin UI meet basic WCAG contrast.
+- [x] T047 Review logging + error handling in `backend/src/middleware/` to ensure embed failures donโ€t crash core flows.
+- [x] T048 Validate quickstart instructions end-to-end (fresh clone โ’ pnpm install โ’ seed mocks โ’ dev servers) and update any gaps.
 
 ---
 
 ## Dependencies & Execution Order
 
-1. **Phase 1 Setup** → must finish before foundational work; T001 precedes parallel T003/T004.
-2. **Phase 2 Foundational** → depends on Phase 1; T006–T012 unblock all user stories.
-3. **User Stories (Phases 3–6)** → each depends on Phase 2 completion but can proceed in priority order or parallel once foundation is ready:
+1. **Phase 1 Setup** โ’ must finish before foundational work; T001 precedes parallel T003/T004.
+2. **Phase 2 Foundational** โ’ depends on Phase 1; T006โ€“T012 unblock all user stories.
+3. **User Stories (Phases 3โ€“6)** โ’ each depends on Phase 2 completion but can proceed in priority order or parallel once foundation is ready:
    - US1 (Auth shell) precedes others logically because admin/analytics views require authenticated routing.
    - US2 depends on US1 session/role infrastructure but can start once those tasks land.
    - US3 depends on analytics API scaffolding (T029/T030) yet is otherwise independent of US2.
    - US4 shares embed metadata config from foundation but does not rely on analytics or admin completion.
-4. **Phase 7 Polish** → runs after desired user stories reach checkpoints.
+4. **Phase 7 Polish** โ’ runs after desired user stories reach checkpoints.
 
 ---
 
@@ -144,9 +144,9 @@
 - Setup: T003 and T004 can run concurrently once T001 is merged.
 - Foundational: T007 (layout) and T008 (server) can proceed in parallel; T011 (API client) can run alongside T009 (mock loader).
 - US1: T014 (auth service) and T016 (login page) can progress simultaneously, converging at T017.
-- US2: Frontend admin UI (T023–T024) can run in parallel with backend services (T021–T022) followed by integration.
-- US3: Chart components (T032) and drill-down panel (T033) are parallelizable once analytics endpoints (T029–T030) exist.
-- US4: Superset and NocoDB components (T039–T040) can be built concurrently referencing shared config (T037).
+- US2: Frontend admin UI (T023โ€“T024) can run in parallel with backend services (T021โ€“T022) followed by integration.
+- US3: Chart components (T032) and drill-down panel (T033) are parallelizable once analytics endpoints (T029โ€“T030) exist.
+- US4: Superset and NocoDB components (T039โ€“T040) can be built concurrently referencing shared config (T037).
 - Polish: T045 (test suite) and T046 (accessibility) touch different areas, so they can run side-by-side.
 
 ---
@@ -154,12 +154,12 @@
 ## Implementation Strategy
 
 1. **MVP (US1 only)**  
-   - Complete Phases 1–2, finish US1 tasks (T013–T019), and validate login + dashboard shell as the first demo slice.
+   - Complete Phases 1โ€“2, finish US1 tasks (T013โ€“T019), and validate login + dashboard shell as the first demo slice.
 
 2. **Incremental Delivery**  
-   - US2 adds admin CRUD; deliver once T020–T026 pass tests.  
-   - US3 layers analytics interactions; release after T027–T035.  
-   - US4 finishes embedding placeholders; ship once T036–T042 succeed.
+   - US2 adds admin CRUD; deliver once T020โ€“T026 pass tests.  
+   - US3 layers analytics interactions; release after T027โ€“T035.  
+   - US4 finishes embedding placeholders; ship once T036โ€“T042 succeed.
 
 3. **Parallel Team Execution**  
    - Developer A: Foundations + US1.  
@@ -167,7 +167,7 @@
    - Developer C: US3 analytics + US4 embeds (after foundational APIs ready).
 
 Each story stays independently testable, enabling demos or releases after every phase.
-\n---\n## Test Run Log � 2025-11-11 11:32:50\n- Lint: PASS\n- Unit tests: PASS (backend 1 file, frontend 1 file; shared none)\n- E2E: PARTIAL � 1 passed, 4 failed\n  - Passed: Authentication rejects invalid credentials\n  - Failed:\n    - Admin menu account management (stuck on /login after valid sign-in)\n    - Sales analytics dashboard (stuck on /login after valid sign-in)\n    - Authentication allows user admin to log in (stuck on /login)\n    - Embedding module (stuck on /login after valid sign-in)\n  - Notes: Likely auth/session handshake issue during E2E. Investigate cookie/session persistence or login flow redirect timing under Playwright.
-\n---\n## Test Run Log � 2025-11-11 11:45:27\n- Lint: PASS\n- Unit tests: PASS (backend 1 file, frontend 1 file; shared none)\n- E2E: PASS � 5/5 passing after fixes\n  - Fixes applied:\n    - Guard against stale session refresh overriding login (frontend/src/hooks/useSession.tsx)\n    - Make category selection robust to Recharts click targets + add container click (frontend/src/components/analytics/RevenueByCategoryChart.tsx)\n    - Ensure a default selected category after data loads (frontend/src/pages/DashboardHome.tsx)
-\n---\n## Phase 7 Status � 2025-11-11 11:48:21\n- T043: Completed (README validated)\n- T044: Completed (checklist present and validated)\n- T045: Completed (lint, unit, e2e all pass)\n- T046: Pending (accessibility/responsiveness pass)\n- T047: Completed (middleware + embed error handling reviewed)\n- T048: Completed (quickstart validated end-to-end)
-\n---\n## Phase 7 Status � 2025-11-11 11:53:40\n- T043: Completed (README validated)\n- T044: Completed (checklist present and validated)\n- T045: Completed (lint, unit, e2e all pass)\n- T046: Completed (accessibility/responsiveness pass across nav, sidebar, charts, admin UI, embeds)\n  - Added landmarks, aria labels, focus-visible outlines, alerts/status regions, and keyboard-friendly controls.\n- T047: Completed (middleware + embed error handling reviewed)\n- T048: Completed (quickstart validated end-to-end)
+\n---\n## Test Run Log — 2025-11-11 11:32:50\n- Lint: PASS\n- Unit tests: PASS (backend 1 file, frontend 1 file; shared none)\n- E2E: PARTIAL — 1 passed, 4 failed\n  - Passed: Authentication rejects invalid credentials\n  - Failed:\n    - Admin menu account management (stuck on /login after valid sign-in)\n    - Sales analytics dashboard (stuck on /login after valid sign-in)\n    - Authentication allows user admin to log in (stuck on /login)\n    - Embedding module (stuck on /login after valid sign-in)\n  - Notes: Likely auth/session handshake issue during E2E. Investigate cookie/session persistence or login flow redirect timing under Playwright.
+\n---\n## Test Run Log — 2025-11-11 11:45:27\n- Lint: PASS\n- Unit tests: PASS (backend 1 file, frontend 1 file; shared none)\n- E2E: PASS — 5/5 passing after fixes\n  - Fixes applied:\n    - Guard against stale session refresh overriding login (frontend/src/hooks/useSession.tsx)\n    - Make category selection robust to Recharts click targets + add container click (frontend/src/components/analytics/RevenueByCategoryChart.tsx)\n    - Ensure a default selected category after data loads (frontend/src/pages/DashboardHome.tsx)
+\n---\n## Phase 7 Status — 2025-11-11 11:48:21\n- T043: Completed (README validated)\n- T044: Completed (checklist present and validated)\n- T045: Completed (lint, unit, e2e all pass)\n- T046: Pending (accessibility/responsiveness pass)\n- T047: Completed (middleware + embed error handling reviewed)\n- T048: Completed (quickstart validated end-to-end)
+\n---\n## Phase 7 Status — 2025-11-11 11:53:40\n- T043: Completed (README validated)\n- T044: Completed (checklist present and validated)\n- T045: Completed (lint, unit, e2e all pass)\n- T046: Completed (accessibility/responsiveness pass across nav, sidebar, charts, admin UI, embeds)\n  - Added landmarks, aria labels, focus-visible outlines, alerts/status regions, and keyboard-friendly controls.\n- T047: Completed (middleware + embed error handling reviewed)\n- T048: Completed (quickstart validated end-to-end)

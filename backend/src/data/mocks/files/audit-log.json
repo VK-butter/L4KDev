@@ -1,5 +1,13 @@
 [
   {
+    "id": "82cd131d-1c2a-426a-bef3-27ec1464c2d3",
+    "timestamp": "2025-11-11T16:44:49.238Z",
+    "actorId": "user-admin-001",
+    "action": "update",
+    "targetUserId": "49215641-53bb-4ce1-bfeb-6cfb7275c49e",
+    "details": "Updated profile"
+  },
+  {
     "id": "8b6bdabb-75a1-4f4e-ac77-597d3d7177b9",
     "timestamp": "2025-11-11T04:52:17.258Z",
     "actorId": "user-admin-001",

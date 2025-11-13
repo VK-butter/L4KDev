@@ -1,4 +1,4 @@
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useState } from 'react';
 import { TopNav } from './TopNav';
 import { Sidebar } from './Sidebar';
 import type { SessionUser } from '../../hooks/useSession';
@@ -10,6 +10,7 @@ interface AppShellProps extends PropsWithChildren {
 }
 
 export function AppShell({ children, user, onLogout, onAdminMenu }: AppShellProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   return (
     <div className="min-h-screen bg-surface-base text-emerald-950">
       <a
@@ -18,9 +19,9 @@ export function AppShell({ children, user, onLogout, onAdminMenu }: AppShellProp
       >
         Skip to main content
       </a>
-      <TopNav user={user} onLogout={onLogout} onAdminMenu={onAdminMenu} />
+      <TopNav user={user} onLogout={onLogout} onAdminMenu={onAdminMenu} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
       <div className="flex">
-        <Sidebar user={user} />
+        {sidebarOpen && <Sidebar user={user} />}
         <main className="flex-1 px-6 py-8" id="main-content" role="main" aria-label="Main content">
           <div className="mx-auto flex max-w-6xl flex-col gap-6">
             {children}

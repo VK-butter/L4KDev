@@ -8,7 +8,7 @@ function toPlainPassword(password) {
     return `plain:${password}`;
 }
 function sanitize(user) {
-    const { passwordHash, ...rest } = user;
+    const { passwordHash: _passwordHash, ...rest } = user;
     return rest;
 }
 export async function listUsers(options = {}) {

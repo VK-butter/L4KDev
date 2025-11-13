@@ -4,7 +4,7 @@
     "username": "autotest+1762836735211@example.com",
     "displayName": "QA User 1762836735211",
     "role": "analyst",
-    "status": "inactive",
+    "status": "active",
     "passwordHash": "plain:TempPass!123"
   },
   {

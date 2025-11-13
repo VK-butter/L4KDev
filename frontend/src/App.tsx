@@ -5,6 +5,8 @@ import { SessionProvider, useSession } from './hooks/useSession';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardHome } from './pages/DashboardHome';
+import { SalesOrderAnalysis } from './pages/SalesOrderAnalysis';
+import { IntegrationsPage } from './pages/IntegrationsPage';
 import { UserManagementPanel } from './components/admin/UserManagementPanel';
 
 function DashboardLayout() {
@@ -35,6 +37,8 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<DashboardLayout />} />
+            <Route path="/dashboards/sales" element={<SalesLayout />} />
+            <Route path="/integrations" element={<IntegrationsLayout />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -43,4 +47,22 @@ function App() {
   );
 }
 
+function IntegrationsLayout() {
+  const { user, logout } = useSession();
+  return (
+    <AppShell user={user} onLogout={logout}>
+      <IntegrationsPage />
+    </AppShell>
+  );
+}
+
 export default App;
+
+function SalesLayout() {
+  const { user, logout } = useSession();
+  return (
+    <AppShell user={user} onLogout={logout}>
+      <SalesOrderAnalysis />
+    </AppShell>
+  );
+}

@@ -68,5 +68,39 @@ export const analyticsApi = {
   ) =>
     apiClient.get<{ data: AnalyticsDrilldownResponse }>(
       `/analytics/orders/drilldown?${buildQuery(params)}`
-    )
+    ),
+  rawOrders: (params: { page?: number; pageSize?: number; dateStart?: string; dateEnd?: string; status?: string; q?: string }) => {
+    const sp = new URLSearchParams();
+    if (typeof params.page === 'number') sp.set('page', String(params.page));
+    if (typeof params.pageSize === 'number') sp.set('pageSize', String(params.pageSize));
+    if (params.dateStart) sp.set('dateStart', params.dateStart);
+    if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
+    if (params.status) sp.set('status', params.status);
+    if (params.q) sp.set('q', params.q);
+    return apiClient.get<{ data: { columns: string[]; rows: any[]; page: number; pageSize: number; totalRecords: number; totalPages: number } }>(
+      `/analytics/orders/raw?${sp.toString()}`
+    );
+  }
+};
+
+export const analyticsSummaryApi = {
+  rawSummary: (params: { dateStart?: string; dateEnd?: string }) => {
+    const sp = new URLSearchParams();
+    if (params.dateStart) sp.set('dateStart', params.dateStart);
+    if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
+    return apiClient.get<{ data: { totalRecords: number; totalRevenue?: number; totalQuantity?: number } }>(
+      `/analytics/orders/raw/summary?${sp.toString()}`
+    );
+  }
+};
+
+export const analyticsStatusApi = {
+  rawStatus: (params: { dateStart?: string; dateEnd?: string }) => {
+    const sp = new URLSearchParams();
+    if (params.dateStart) sp.set('dateStart', params.dateStart);
+    if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
+    return apiClient.get<{ data: { total: number; rows: Array<{ status: string; count: number }> } }>(
+      `/analytics/orders/raw/status?${sp.toString()}`
+    );
+  }
 };

@@ -32,6 +32,8 @@ export function IntegrationsPanel() {
   const [dashboards, setDashboards] = useState<Array<{ id: string; title: string; url: string }>>([]);
   const [newDash, setNewDash] = useState<{ title: string; url: string }>({ title: '', url: '' });
   const [addDashOpen, setAddDashOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{ title: string; url: string }>({ title: '', url: '' });
 
   async function refresh() {
     setLoading(true);
@@ -156,37 +158,102 @@ export function IntegrationsPanel() {
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-emerald-700 text-white text-xs font-bold">SS</span>
                 <span>Superset</span>
               </button>
-              {selected === 'superset' && dashboards.length > 0 && (
-                <ul className="mt-2 ml-9 space-y-1" role="list">
-                  {dashboards.map((d) => (
-                    <li key={d.id} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        title={d.title}
-                        className="flex-1 truncate text-left text-xs text-emerald-700 hover:underline"
-                        onClick={() => {
-                          setSupersetMode('link');
-                          localStorage.setItem('superset.mode', 'link');
-                          setSupersetUrl(d.url);
-                        }}
-                      >
-                        {d.title}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-rose-600 text-xs"
-                        onClick={async () => {
-                          await supersetIntegrationApi.deleteDashboard(d.id);
-                          const next = await supersetIntegrationApi.listDashboards();
-                          setDashboards(next.data.dashboards);
-                        }}
-                      >
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ul className="mt-2 ml-9 space-y-1" role="list">
+                {dashboards.map((d) => (
+                  <li key={d.id} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      title={d.title}
+                      className="flex-1 truncate text-left text-xs text-emerald-700 hover:underline"
+                      onClick={() => {
+                        setSupersetMode('link');
+                        localStorage.setItem('superset.mode', 'link');
+                        setSupersetUrl(d.url);
+                      }}
+                    >
+                      {d.title}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-emerald-700 text-xs"
+                      title="Edit"
+                      onClick={() => {
+                        setSelected('superset');
+                        setEditingId(d.id);
+                        setEditDraft({ title: d.title, url: d.url });
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="text-rose-600 text-xs"
+                      title="Delete"
+                      onClick={async () => {
+                        await supersetIntegrationApi.deleteDashboard(d.id);
+                        const next = await supersetIntegrationApi.listDashboards();
+                        setDashboards(next.data.dashboards);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+                <li>
+                  {!addDashOpen ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-800 hover:border-emerald-400"
+                      onClick={() => setAddDashOpen(true)}
+                      title="Add dashboard"
+                    >
+                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white">+</span>
+                      <span>Add dashboard</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-1">
+                      <input
+                        className="w-full rounded border border-emerald-200 px-2 py-1 text-xs"
+                        placeholder="Title"
+                        value={newDash.title}
+                        onChange={(e) => setNewDash({ ...newDash, title: e.target.value })}
+                      />
+                      <input
+                        className="w-full rounded border border-emerald-200 px-2 py-1 text-xs"
+                        placeholder="https://.../superset/dashboard/..."
+                        value={newDash.url}
+                        onChange={(e) => setNewDash({ ...newDash, url: e.target.value })}
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="rounded bg-emerald-600 px-2 py-1 text-xs text-white hover:bg-emerald-500"
+                          onClick={async () => {
+                            if (!newDash.title || !newDash.url) return;
+                            await supersetIntegrationApi.addDashboard({ title: newDash.title, url: newDash.url });
+                            const d = await supersetIntegrationApi.listDashboards();
+                            setDashboards(d.data.dashboards);
+                            setNewDash({ title: '', url: '' });
+                            setAddDashOpen(false);
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-emerald-200 px-2 py-1 text-xs text-emerald-800 hover:border-emerald-400"
+                          onClick={() => {
+                            setNewDash({ title: '', url: '' });
+                            setAddDashOpen(false);
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              </ul>
             </li>
             <li>
               <button
@@ -213,62 +280,7 @@ export function IntegrationsPanel() {
               </button>
             </li>
           </ul>
-          <div className="mt-4 border-t border-emerald-100 pt-3">
-            {!addDashOpen ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-800 hover:border-emerald-400"
-                onClick={() => setAddDashOpen(true)}
-                title="Add dashboard"
-              >
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">+</span>
-                <span>Add dashboard</span>
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <div className="grid gap-2">
-                  <input
-                    className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm"
-                    placeholder="Title"
-                    value={newDash.title}
-                    onChange={(e) => setNewDash({ ...newDash, title: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm"
-                    placeholder="https://.../superset/dashboard/..."
-                    value={newDash.url}
-                    onChange={(e) => setNewDash({ ...newDash, url: e.target.value })}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-                    onClick={async () => {
-                      if (!newDash.title || !newDash.url) return;
-                      await supersetIntegrationApi.addDashboard({ title: newDash.title, url: newDash.url });
-                      const d = await supersetIntegrationApi.listDashboards();
-                      setDashboards(d.data.dashboards);
-                      setNewDash({ title: '', url: '' });
-                      setAddDashOpen(false);
-                    }}
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-emerald-200 px-3 py-2 text-sm text-emerald-800 hover:border-emerald-400"
-                    onClick={() => {
-                      setNewDash({ title: '', url: '' });
-                      setAddDashOpen(false);
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          
         </aside>
 
         {/* Right: detail/editor */}
@@ -345,6 +357,51 @@ export function IntegrationsPanel() {
                 <h4 className="text-lg font-semibold text-emerald-900">Dashboard Access (no credentials stored)</h4>
                 <p className="mt-1 text-emerald-700">Paste the dashboard URL you can access. We will not store any username/password. You will authenticate directly with Superset.</p>
               </div>
+
+              {editingId && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                  <p className="text-xs uppercase tracking-widest text-emerald-500">Edit Dashboard</p>
+                  <div className="mt-2 grid gap-3 md:grid-cols-3">
+                    <label className="text-xs text-emerald-700">Title
+                      <input
+                        className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2"
+                        value={editDraft.title}
+                        onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })}
+                      />
+                    </label>
+                    <label className="text-xs text-emerald-700 md:col-span-2">URL
+                      <input
+                        className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2"
+                        value={editDraft.url}
+                        onChange={(e) => setEditDraft({ ...editDraft, url: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                      onClick={async () => {
+                        const id = editingId;
+                        await supersetIntegrationApi.updateDashboard(id, { title: editDraft.title, url: editDraft.url });
+                        const next = await supersetIntegrationApi.listDashboards();
+                        setDashboards(next.data.dashboards);
+                        setSupersetUrl(editDraft.url);
+                        setEditingId(null);
+                      }}
+                    >
+                      Save Changes
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-emerald-200 px-3 py-2 text-sm text-emerald-800 hover:border-emerald-400"
+                      onClick={() => setEditingId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
               <label className="block text-xs text-emerald-700">Dashboard URL
                 <input
                   className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2"
@@ -461,7 +518,7 @@ export function IntegrationsPanel() {
                     title="Superset Embedded"
                     src={supersetUrl}
                     className="h-full w-full"
-                    sandbox="allow-same-origin allow-scripts allow-forms"
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
                   />
                 </div>
               )}

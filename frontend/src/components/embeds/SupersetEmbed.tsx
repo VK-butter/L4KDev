@@ -26,7 +26,7 @@ export function SupersetEmbed({ target }: SupersetEmbedProps) {
             title={target.title}
             src={target.placeholderUrl}
             className="h-full w-full"
-            sandbox="allow-same-origin allow-scripts allow-forms"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
           />
         </div>
       </div>

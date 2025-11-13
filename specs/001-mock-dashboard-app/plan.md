@@ -7,6 +7,25 @@
 
 Build a green-themed mock web application that reuses the Sale-Dashboard-prototype-Embeded structure while adding authenticated access, an admin-only account management menu in the top bar, a modular sales analytics workspace with interactive filters/drill downs, and embed placeholders for Apache Superset and NocoDB, all backed by a mock data/service layer that simulates a future PostgreSQL-over-SSH connection.
 
+## Current Progress (2025-11-13)
+
+- Backend
+  - Express server with session middleware, mock data loader, and Zod validation where applicable.
+  - Analytics endpoints: `/api/analytics/orders/raw`, `/api/analytics/orders/raw/summary`, `/api/analytics/orders/raw/status`.
+  - Auth and Admin APIs: login/logout/session probe; user CRUD + audit log over mock store.
+  - `pg` pool scaffolded for future SSH/Postgres; env-driven config documented.
+- Frontend
+  - App shell with top nav + sidebar; protected routing and session hooks.
+  - Sales dashboard with date filters, KPIs, charts (Recharts), and drill-down table.
+  - Admin UI (panels/modals) with form validation and optimistic updates.
+  - Embeds (Superset iframe, NocoDB placeholder) + SSH helper; error handling UX.
+- Tests/Docs
+  - Lint + unit + Playwright E2E passing; quickstart and contracts validated.
+
+Next
+- Optional: persist price/quantity targets in backend store (admin-editable).
+- Optional: CSV streaming endpoint for large exports.
+
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x (React 18 frontend) + Node.js 20 (Express backend)  

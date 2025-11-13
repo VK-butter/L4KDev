@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -9,6 +10,7 @@ import authRouter from './api/auth/routes';
 import adminRouter from './api/admin/routes';
 import analyticsRouter from './api/analytics/ordersRoutes';
 import embedRouter from './api/analytics/embedRoutes';
+import integrationsRouter from './api/integrations/routes';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
@@ -28,6 +30,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/analytics/embeds', embedRouter);
+app.use('/api/integrations', integrationsRouter);
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -40,13 +43,11 @@ app.use((req, res, next) => {
 });
 app.use((err, _req, res, _next) => {
     const statusCode = err.status ?? 500;
-    // eslint-disable-next-line no-console
     console.error(`[API ERROR] (${statusCode})`, err);
     res.status(statusCode).json({
         error: err.message ?? 'Internal Server Error'
     });
 });
 app.listen(PORT, () => {
-    // eslint-disable-next-line no-console
-    console.log(`API server ready on http://localhost:${PORT}`);
+    console.info(`API server ready on http://localhost:${PORT}`);
 });

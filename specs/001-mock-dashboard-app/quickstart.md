@@ -23,22 +23,48 @@
    ```
    Frontend dev server proxies `/api/*` to the backend.
 
+5. **PostgreSQL via SSH tunnel (optional live data)**
+   1. Open a tunnel:
+      ```
+      ssh -N -L 5432:127.0.0.1:5432 <user>@<host>
+      ```
+   2. Create `backend/.env`:
+      ```
+      PGHOST=127.0.0.1
+      PGPORT=5432
+      PGDATABASE=sales_warehouse
+      PGUSER=<db-user>
+      PGPASSWORD=<db-pass>
+      RAW_DATE_COLUMN=Order Date
+      # optional if auto-detect fails
+      # RAW_STATUS_COLUMN=...
+      # RAW_REVENUE_COLUMN=...
+      # RAW_QUANTITY_COLUMN=...
+      ```
+   3. Restart backend.
+
+6. **Sales page**
+   - Navigate to `/dashboards/sales` from the sidebar (“Sale order line”).
+   - Use calendar pickers (Daily = yesterday→today; YTD = Jan 1→today; All = clear).
+   - Export all filtered rows (CSV) from the table header.
+   - Status donut (Saled vs Cancel): click labels to filter the table.
+
 5. **Demo credentials**
    - Analyst: `analyst@example.com / Analyst!123`
    - User Admin: `admin@example.com / Admin!123`
 
-6. **Testing**
+7. **Testing**
    ```bash
    pnpm test                     # runs workspace unit tests (Vitest)
    pnpm --filter frontend exec playwright install chromium   # one-time browser install
    pnpm test:e2e                 # executes Playwright flows (auth, admin, analytics, embeds)
    ```
 
-7. **Embedding configuration**
+8. **Embedding configuration**
    - Update `shared/config/embeds.ts` to point Superset iframe to the eventual SSH-tunneled URL.
    - Update `backend/src/services/embeds/nocodb.ts` with the real API base when available.
 
-8. **Environment variables**
+9. **Environment variables**
    - Create `backend/.env` with:
      ```
      PORT=4000

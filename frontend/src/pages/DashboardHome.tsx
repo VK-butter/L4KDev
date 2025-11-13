@@ -12,6 +12,7 @@ import { RevenueByCategoryChart } from '../components/analytics/RevenueByCategor
 import { RevenueTrendChart } from '../components/analytics/RevenueTrendChart';
 import { OrderDrilldownPanel } from '../components/analytics/OrderDrilldownPanel';
 import { EmbedSwitcher } from '../components/embeds/EmbedSwitcher';
+import { RawDbPreview } from '../components/analytics/RawDbPreview';
 
 const STATUS_OPTIONS = ['Pending', 'Fulfilled', 'Cancelled'];
 
@@ -170,6 +171,9 @@ export function DashboardHome() {
 
   return (
     <div className="flex flex-col gap-6" data-testid="analytics-dashboard">
+      {/* Always show DB preview at top (SELECT * pagination) */}
+      <RawDbPreview />
+
       <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
@@ -267,6 +271,8 @@ export function DashboardHome() {
         onStatusChange={(status) => setDrilldownStatus(status)}
         onPageChange={setDrilldownPage}
       />
+
+      {/* DB preview moved to top */}
 
       <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
         <header className="mb-4 flex items-center justify-between">

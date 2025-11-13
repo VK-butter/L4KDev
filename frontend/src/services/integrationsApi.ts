@@ -48,5 +48,10 @@ export const supersetIntegrationApi = {
       '/integrations/superset/dashboards',
       payload
     ),
+  updateDashboard: (id: string, payload: { title?: string; url?: string }) =>
+    apiClient.patch<{ dashboard: { id: string; title: string; url: string } }>(
+      `/integrations/superset/dashboards/${id}`,
+      payload
+    ),
   deleteDashboard: (id: string) => apiClient.delete(`/integrations/superset/dashboards/${id}`)
 };

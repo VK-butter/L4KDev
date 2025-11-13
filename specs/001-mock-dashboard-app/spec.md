@@ -2,10 +2,24 @@
 
 **Feature Branch**: `001-mock-dashboard-app`  
 **Created**: 2025-11-10  
-**Status**: Draft  
+**Status**: Complete  
 **Input**: User description: "Using the existing GitHub repository Sale-Dashboard-prototype-Embeded (https://github.com/VK-butter/Sale-Dashboard-prototype-Embeded.git) as the starting point, build a fully functional mock web application for dashboards. Requirements: Add a green-themed UI. Include a login page (user authentication) that leads to the main dashboard. Include a persistent top navigation bar and a left sidebar for chart/dashboard navigation. Implement a Sales Order Analysis Dashboard with mock data (orders, revenue, categories, dates) with interactive filtering and drill-down. Integrate embedding placeholders/components for external dashboards: e.g., Apache Superset (iframe), NocoDB API charts. Structure the backend to simulate a future connection to PostgreSQL via SSH tunnel, though for now use local mock data. Provide modular code (front-end, back-end, data layer, embedding module) and annotate where the GitHub project's existing files are extended or replaced."
 
 ## User Scenarios & Testing *(mandatory)*
+
+## Current Progress (2025-11-13)
+
+- Authenticated shell delivered: login page, session guard, protected routes, role-aware Admin menu.
+- Admin user management: add/edit/deactivate/reactivate with audit log; UI wired to backend admin APIs.
+- Sales analytics workspace: date filters, KPIs, revenue-by-category bar, revenue trend, drill-down table with pagination; interactive category drill and status filters.
+- Embeds playground: Superset iframe + NocoDB placeholder with error handling and integration notes; SSH tunnel helper UI.
+- Backend implemented: Express server, session middleware, mock data layer, analytics routes (`/api/analytics/orders/raw`, `/raw/summary`, `/raw/status`), admin routes, auth routes.
+- Environment: `.env` documented; `pg` pool scaffolded for future SSH/Postgres hookup.
+- Testing: lint + unit + Playwright E2E all passing per tasks log.
+
+Open items
+- Optional: persist targets for price/quantity via backend store.
+- Optional: CSV streaming endpoint for large exports.
 
 ### User Story 1 - Authenticate into dashboard shell (Priority: P1)
 

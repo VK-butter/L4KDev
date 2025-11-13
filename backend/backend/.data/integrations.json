@@ -1,0 +1,19 @@
+{
+  "superset": {
+    "baseUrl": "https://bi.staff.thaiadapp.com/",
+    "username": "learning4kidz",
+    "password": "9T5UHskqBVy4EOqHiK6t",
+    "dashboards": [
+      {
+        "id": "8dbbf86b-176a-45fd-aeb6-93539ff3ef98",
+        "title": "monthly sale",
+        "url": "https://bi.staff.thaiadapp.com/superset/dashboard/p/vWDq5M7q1w2/"
+      },
+      {
+        "id": "67c2db42-93d4-4fe2-9b96-80a97edf888f",
+        "title": "test",
+        "url": "https://bi.staff.thaiadapp.com/superset/dashboard/9/?native_filters_key=UIRNz6wqhshoVWJIirMSn5VhbWY4IhH2KuLWKuDy8w2Ke5-wSGRWMvVx9W3b53Jg&standalone=true"
+      }
+    ]
+  }
+}

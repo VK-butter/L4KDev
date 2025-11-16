@@ -12,6 +12,13 @@ import {
 import { NoDataState } from './NoDataState';
 import { useCallback } from 'react';
 
+type BarClickPayload = {
+  payload?: {
+    category?: string;
+  };
+  category?: string;
+};
+
 interface Props {
   data: AnalyticsCategoryBreakdown[];
   loading: boolean;
@@ -90,7 +97,7 @@ export function RevenueByCategoryChart({
                 dataKey="revenue"
                 fill="#10b981"
                 cursor="pointer"
-                onClick={(dataPoint: any) => {
+                onClick={(dataPoint: BarClickPayload) => {
                   const category = dataPoint?.payload?.category ?? dataPoint?.category;
                   if (typeof category === 'string' && category.length > 0) {
                     onSelectCategory?.(

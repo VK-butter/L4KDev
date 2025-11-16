@@ -23,7 +23,11 @@ const STORE_PATH = path.join(DATA_DIR, 'integrations.json');
 async function ensureDataDir() {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
-  } catch {}
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw error;
+    }
+  }
 }
 
 async function loadStore(): Promise<Store> {

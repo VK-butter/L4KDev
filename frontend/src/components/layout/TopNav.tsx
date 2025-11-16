@@ -19,7 +19,7 @@ interface TopNavProps {
 export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavProps) {
   const location = useLocation();
   const [logoError, setLogoError] = useState(false);
-  const logoUrl = (import.meta as any)?.env?.VITE_BRAND_LOGO_URL || '/brand/logo.png';
+  const logoUrl = import.meta.env.VITE_BRAND_LOGO_URL ?? '/brand/logo.png';
   return (
     <header
       className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-100 bg-white/90 px-8 py-4 backdrop-blur"

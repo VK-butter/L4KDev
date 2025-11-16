@@ -21,9 +21,8 @@ function fmtDDMMYYYY(d: Date) {
 function getMonthGrid(year: number, monthIndex: number) {
   const first = new Date(year, monthIndex, 1);
   const startDay = first.getDay(); // 0=Sun
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const cells: Array<{ date: Date; inMonth: boolean }>[] = [];
-  let current = new Date(year, monthIndex, 1 - startDay);
+  const current = new Date(year, monthIndex, 1 - startDay);
   for (let week = 0; week < 6; week++) {
     const row: Array<{ date: Date; inMonth: boolean }> = [];
     for (let i = 0; i < 7; i++) {
@@ -142,4 +141,3 @@ export function DatePicker({ label, valueISO, onChangeISO }: DatePickerProps) {
     </div>
   );
 }
-

@@ -1,17 +1,8 @@
 import { useEffect, useState } from 'react';
-import { analyticsApi } from '../../services/analyticsApi';
-
-interface RawDataPage {
-  columns: string[];
-  rows: any[];
-  page: number;
-  pageSize: number;
-  totalRecords: number;
-  totalPages: number;
-}
+import { analyticsApi, type RawOrdersPage } from '../../services/analyticsApi';
 
 export function RawDbPreview() {
-  const [data, setData] = useState<RawDataPage | null>(null);
+  const [data, setData] = useState<RawOrdersPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);

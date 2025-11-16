@@ -35,25 +35,6 @@ export function IntegrationsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ title: string; url: string }>({ title: '', url: '' });
 
-  async function refresh() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await integrationsApi.status();
-      setData(res.data);
-      try {
-        const s = await supersetIntegrationApi.status();
-        setSupersetStatus(s.data);
-      } catch {
-        // ignore
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -458,14 +439,17 @@ export function IntegrationsPanel() {
                   Open Dashboard
                 </a>
                 <a
-                  href={(function () {
-                    try {
-                      if (supersetUrl) {
-                        const u = new URL(supersetUrl);
+                  href={(() => {
+                    const trimmed = supersetUrl?.trim();
+                    if (trimmed) {
+                      try {
+                        const u = new URL(trimmed);
                         return `${u.origin}/login/`;
+                      } catch {
+                        // ignore malformed URL and fall through to manual fallback
                       }
-                    } catch {}
-                    const base = (document.getElementById('superset-base') as HTMLInputElement)?.value?.trim();
+                    }
+                    const base = (document.getElementById('superset-base') as HTMLInputElement | null)?.value?.trim();
                     return base ? `${base.replace(/\/$/, '')}/login/` : '#';
                   })()}
                   target="_blank"

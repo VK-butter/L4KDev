@@ -1,22 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { analyticsApi, analyticsSummaryApi, analyticsStatusApi } from '../services/analyticsApi';
+import {
+  analyticsApi,
+  analyticsSummaryApi,
+  analyticsStatusApi,
+  type RawOrdersPage
+} from '../services/analyticsApi';
 
-interface RawDataPage {
-  columns: string[];
-  rows: any[];
-  page: number;
-  pageSize: number;
-  totalRecords: number;
-  totalPages: number;
-}
+type ApiErrorResponse = {
+  response?: {
+    data?: {
+      error?: unknown;
+    };
+  };
+};
+
+type PieClickPayload = {
+  name?: string;
+};
 
 function toIso(d: Date) { return d.toISOString().slice(0, 10); }
 
 export function SalesOrderAnalysis() {
   const [dateStart, setDateStart] = useState<string>(''); // yyyy-mm-dd
   const [dateEnd, setDateEnd] = useState<string>(''); // yyyy-mm-dd
-  const [data, setData] = useState<RawDataPage | null>(null);
+  const [data, setData] = useState<RawOrdersPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -80,9 +88,13 @@ export function SalesOrderAnalysis() {
         if (!ignore) setData(res.data.data);
       } catch (e) {
         if (!ignore) {
-          const anyErr = e as any;
-          const serverMsg = anyErr?.response?.data?.error;
-          const msg = typeof serverMsg === 'string' ? serverMsg : (e instanceof Error ? e.message : 'Failed to load');
+          const serverMsg = (e as ApiErrorResponse)?.response?.data?.error;
+          const msg =
+            typeof serverMsg === 'string'
+              ? serverMsg
+              : e instanceof Error
+              ? e.message
+              : 'Failed to load';
           setError(msg);
         }
       } finally {
@@ -133,7 +145,7 @@ export function SalesOrderAnalysis() {
     URL.revokeObjectURL(url);
   }
 
-  function mapCellDisplay(column: string, value: any): string {
+  function mapCellDisplay(column: string, value: unknown): string {
     const s = String(value ?? '');
     const n = s.trim().toLowerCase();
     if (n === 'saled') return 'Complete';
@@ -148,7 +160,7 @@ export function SalesOrderAnalysis() {
     const end = dateEnd || undefined;
 
     // Ensure we have columns and total count
-    let columns = data?.columns ?? [] as string[];
+    let columns = data?.columns ?? [];
     let totalRecords = summary?.totalRecords;
     if (!totalRecords || totalRecords < 0) {
       try {
@@ -171,7 +183,6 @@ export function SalesOrderAnalysis() {
     const allRows: string[] = [];
 
     for (let p = 1; p <= totalPages; p++) {
-      // eslint-disable-next-line no-await-in-loop
       const res = await analyticsApi.rawOrders({ page: p, pageSize, dateStart: start, dateEnd: end, status: statusFilter || undefined, q: debouncedSearch || undefined });
       const rows = res.data.data.rows.map((row) =>
         columns
@@ -336,7 +347,7 @@ export function SalesOrderAnalysis() {
                             outerRadius={95}
                             paddingAngle={4}
                             dataKey="value"
-                            onClick={(entry: any) => {
+                            onClick={(entry: PieClickPayload) => {
                               const label = entry?.name as string;
                               if (!label) return;
                               handleStatusSelect(label);

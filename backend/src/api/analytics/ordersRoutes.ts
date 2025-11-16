@@ -113,7 +113,8 @@ router.get('/orders/raw', async (req, res, next) => {
           .string()
           .optional()
           .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd'),
-        status: z.string().optional()
+        status: z.string().optional(),
+        q: z.string().optional()
       })
       .parse(req.query);
 
@@ -158,7 +159,7 @@ router.get('/orders/raw', async (req, res, next) => {
       }
 
       const parts: string[] = [];
-      const params: any[] = [];
+      const params: Array<string | number> = [];
       if (querySchema.dateStart && querySchema.dateEnd) {
         parts.push(`(${dateColumn}::date BETWEEN $${params.length + 1} AND $${params.length + 2})`);
         params.push(querySchema.dateStart, querySchema.dateEnd);
@@ -168,9 +169,9 @@ router.get('/orders/raw', async (req, res, next) => {
         params.push(querySchema.status);
       }
       // Optional keyword search across common text-like columns
-      const rawQ = (req.query as any)?.q as string | undefined;
-      if (rawQ && rawQ.trim().length > 0) {
-        const q = `%${rawQ.trim()}%`;
+      const rawQ = querySchema.q?.trim();
+      if (rawQ && rawQ.length > 0) {
+        const q = `%${rawQ}%`;
         const preferred = [
           'order_name',
           'customer',
@@ -201,8 +202,8 @@ router.get('/orders/raw', async (req, res, next) => {
         }
       }
       const where = parts.length ? `WHERE ${parts.join(' AND ')}` : '';
-      const countParams: any[] = [...params];
-      const dataParams: any[] = [...params, offset, pageSize];
+      const countParams = [...params];
+      const dataParams: Array<string | number> = [...params, offset, pageSize];
 
       const countSql = `SELECT COUNT(*)::bigint AS cnt FROM l4k_model.joinsales_orderline ${where}`;
       const dataSql = `SELECT * FROM l4k_model.joinsales_orderline ${where} OFFSET $${params.length + 1} LIMIT $${params.length + 2}`;
@@ -260,7 +261,7 @@ router.get('/orders/raw/summary', async (req, res, next) => {
         const exact = fieldNames.find((n) => normalize(n) === 'orderdate');
         chosenDate = exact ?? fieldNames.find((n) => normalize(n).includes('date')) ?? 'order_date';
       }
-      const dateColumn = '"' + chosenDate.replace(/\"/g, '\"\"') + '"';
+      const dateColumn = `"${chosenDate.replace(/"/g, '""')}"`;
 
       const envRev = process.env.RAW_REVENUE_COLUMN;
       const revCandidates = ['revenue', 'amount', 'price', 'totalprice', 'รวมราคา'];
@@ -286,11 +287,13 @@ router.get('/orders/raw/summary', async (req, res, next) => {
 
       const hasDateFilter = querySchema.dateStart && querySchema.dateEnd;
       const where = hasDateFilter ? `WHERE (${dateColumn}::date BETWEEN $1 AND $2)` : '';
-      const params: any[] = hasDateFilter ? [querySchema.dateStart, querySchema.dateEnd] : [];
+      const params: Array<string | number> = hasDateFilter
+        ? [querySchema.dateStart as string, querySchema.dateEnd as string]
+        : [];
 
       const selectParts = ['COUNT(*)::bigint AS cnt'];
-      if (chosenRev) selectParts.push(`SUM("${chosenRev.replace(/\"/g, '\"\"')}")::numeric AS revenue`);
-      if (chosenQty) selectParts.push(`SUM("${chosenQty.replace(/\"/g, '\"\"')}")::numeric AS quantity`);
+      if (chosenRev) selectParts.push(`SUM("${chosenRev.replace(/"/g, '""')}")::numeric AS revenue`);
+      if (chosenQty) selectParts.push(`SUM("${chosenQty.replace(/"/g, '""')}")::numeric AS quantity`);
 
       const sql = `SELECT ${selectParts.join(', ')} FROM l4k_model.joinsales_orderline ${where}`;
       const result = await client.query(sql, params);
@@ -341,7 +344,7 @@ router.get('/orders/raw/status', async (req, res, next) => {
         const exact = fieldNames.find((n) => normalize(n) === 'orderdate');
         chosenDate = exact ?? fieldNames.find((n) => normalize(n).includes('date')) ?? 'order_date';
       }
-      const dateColumn = '"' + chosenDate.replace(/\"/g, '\"\"') + '"';
+      const dateColumn = `"${chosenDate.replace(/"/g, '""')}"`;
 
       // Status column detection
       const envStatus = process.env.RAW_STATUS_COLUMN;
@@ -354,11 +357,13 @@ router.get('/orders/raw/status', async (req, res, next) => {
         });
         chosenStatus = match ?? 'status';
       }
-      const statusColumn = '"' + chosenStatus.replace(/\"/g, '\"\"') + '"';
+      const statusColumn = `"${chosenStatus.replace(/"/g, '""')}"`;
 
       const hasDateFilter = querySchema.dateStart && querySchema.dateEnd;
       const where = hasDateFilter ? `WHERE (${dateColumn}::date BETWEEN $1 AND $2)` : '';
-      const params: any[] = hasDateFilter ? [querySchema.dateStart, querySchema.dateEnd] : [];
+      const params: Array<string | number> = hasDateFilter
+        ? [querySchema.dateStart as string, querySchema.dateEnd as string]
+        : [];
 
       const sql = `SELECT ${statusColumn} AS status, COUNT(*)::bigint AS cnt FROM l4k_model.joinsales_orderline ${where} GROUP BY 1`;
       const result = await client.query(sql, params);

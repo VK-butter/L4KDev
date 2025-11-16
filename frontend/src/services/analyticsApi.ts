@@ -20,6 +20,17 @@ type QueryParams = AnalyticsFilterParams & {
   pageSize?: number;
 };
 
+export type RawOrderRow = Record<string, unknown>;
+
+export interface RawOrdersPage {
+  columns: string[];
+  rows: RawOrderRow[];
+  page: number;
+  pageSize: number;
+  totalRecords: number;
+  totalPages: number;
+}
+
 function buildQuery(params: QueryParams) {
   const searchParams = new URLSearchParams();
   searchParams.set('dateStart', params.dateStart);
@@ -77,7 +88,7 @@ export const analyticsApi = {
     if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
     if (params.status) sp.set('status', params.status);
     if (params.q) sp.set('q', params.q);
-    return apiClient.get<{ data: { columns: string[]; rows: any[]; page: number; pageSize: number; totalRecords: number; totalPages: number } }>(
+    return apiClient.get<{ data: RawOrdersPage }>(
       `/analytics/orders/raw?${sp.toString()}`
     );
   }

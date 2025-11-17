@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1.6
 FROM node:20-alpine AS base
 WORKDIR /app
-ENV NODE_ENV=production
 RUN apk add --no-cache libc6-compat \
   && corepack enable
 
@@ -19,7 +18,9 @@ WORKDIR /app/backend
 ENV NODE_ENV=production
 COPY --from=build /app/backend/package.json ./package.json
 COPY --from=build /app/backend/node_modules ./node_modules
-COPY --from=build /app/backend/dist ./dist
-COPY backend/src/data/mocks/files ./dist/data/mocks/files
+COPY --from=build /app/node_modules /app/node_modules
+COPY --from=build /app/backend/src ./src
+COPY --from=build /app/backend/tsconfig.json ./tsconfig.json
+COPY --from=build /app/shared ../shared
 EXPOSE 4000
-CMD ["node", "dist/server.js"]
+CMD ["pnpm", "exec", "tsx", "src/server.ts"]

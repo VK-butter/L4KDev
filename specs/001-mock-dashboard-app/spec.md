@@ -7,14 +7,14 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-## Current Progress (2025-11-13)
+## Current Progress (2025-11-17)
 
 - Authenticated shell delivered: login page, session guard, protected routes, role-aware Admin menu.
 - Admin user management: add/edit/deactivate/reactivate with audit log; UI wired to backend admin APIs.
-- Sales analytics workspace: date filters, KPIs, revenue-by-category bar, revenue trend, drill-down table with pagination; interactive category drill and status filters.
+- Sales analytics workspace: date filters, KPI board, revenue-by-category bar, revenue trend, drill-down table with pagination; interactive category drill and status filters.
 - Embeds playground: Superset iframe + NocoDB placeholder with error handling and integration notes; SSH tunnel helper UI.
 - Backend implemented: Express server, session middleware, mock data layer, analytics routes (`/api/analytics/orders/raw`, `/raw/summary`, `/raw/status`), admin routes, auth routes.
-- Environment: `.env` documented; `pg` pool scaffolded for future SSH/Postgres hookup.
+- Environment & deployment: `.env` instructions synced with `quickstart.md`; production-ready Dockerfiles, compose stack, environment templates, and the `deployment/` checklist + host runbook now cover end-to-end rollout.
 - Testing: lint + unit + Playwright E2E all passing per tasks log.
 
 Open items

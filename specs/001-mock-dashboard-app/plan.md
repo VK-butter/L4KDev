@@ -7,7 +7,7 @@
 
 Build a green-themed mock web application that reuses the Sale-Dashboard-prototype-Embeded structure while adding authenticated access, an admin-only account management menu in the top bar, a modular sales analytics workspace with interactive filters/drill downs, and embed placeholders for Apache Superset and NocoDB, all backed by a mock data/service layer that simulates a future PostgreSQL-over-SSH connection.
 
-## Current Progress (2025-11-13)
+## Current Progress (2025-11-17)
 
 - Backend
   - Express server with session middleware, mock data loader, and Zod validation where applicable.
@@ -19,8 +19,11 @@ Build a green-themed mock web application that reuses the Sale-Dashboard-prototy
   - Sales dashboard with date filters, KPIs, charts (Recharts), and drill-down table.
   - Admin UI (panels/modals) with form validation and optimistic updates.
   - Embeds (Superset iframe, NocoDB placeholder) + SSH helper; error handling UX.
-- Tests/Docs
-  - Lint + unit + Playwright E2E passing; quickstart and contracts validated.
+- Deployment/Docs
+  - Production Dockerfiles for backend/frontend, `deployment/docker-compose.yml`, env templates, operator checklist, and host runbook ready for hand-off.
+  - Quickstart instructions updated to mirror `.env` requirements; plan/spec/tasks/checklist aligned.
+- Tests
+  - Lint + unit + Playwright E2E passing; latest results captured in `tasks.md`.
 
 Next
 - Optional: persist price/quantity targets in backend store (admin-editable).

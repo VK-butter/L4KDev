@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { EmbeddingTarget } from '@shared/index';
 import { embedApi } from '../../services/embedApi';
-import { SupersetEmbed } from './SupersetEmbed';
-import { NocoDbPlaceholder } from './NocoDbPlaceholder';
+import { IframeEmbed } from './IframeEmbed';
+import { NocoDbTableEmbed } from './NocoDbTableEmbed';
 
-export function EmbedSwitcher() {
+interface EmbedSwitcherProps {
+  initialTargetId?: string | null;
+  onSelect?: (id: string) => void;
+}
+
+export function EmbedSwitcher({ initialTargetId, onSelect }: EmbedSwitcherProps) {
   const [targets, setTargets] = useState<EmbeddingTarget[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +24,18 @@ export function EmbedSwitcher() {
         const { data } = await embedApi.list();
         if (!cancelled) {
           setTargets(data.embeds);
-          setSelectedId(data.embeds[0]?.id ?? null);
+          setSelectedId((prev) => {
+            if (prev && data.embeds.some((target) => target.id === prev)) {
+              return prev;
+            }
+            if (
+              initialTargetId &&
+              data.embeds.some((target) => target.id === initialTargetId)
+            ) {
+              return initialTargetId;
+            }
+            return data.embeds[0]?.id ?? null;
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -37,7 +53,16 @@ export function EmbedSwitcher() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialTargetId]);
+
+  useEffect(() => {
+    if (!initialTargetId) return;
+    setSelectedId((prev) => {
+      if (!initialTargetId) return prev;
+      if (prev === initialTargetId) return prev;
+      return initialTargetId;
+    });
+  }, [initialTargetId]);
 
   if (loading) {
     return (
@@ -69,7 +94,10 @@ export function EmbedSwitcher() {
             key={target.id}
             type="button"
             data-testid={`embed-tab-${target.id}`}
-            onClick={() => setSelectedId(target.id)}
+            onClick={() => {
+              setSelectedId(target.id);
+              onSelect?.(target.id);
+            }}
             role="tab"
             aria-selected={selectedId === target.id}
             aria-controls={`embed-panel-${target.id}`}
@@ -90,8 +118,8 @@ export function EmbedSwitcher() {
         id={`embed-panel-${selectedId}`}
         aria-live="polite"
       >
-        {selected?.type === 'iframe' && <SupersetEmbed target={selected} />}
-        {selected?.type === 'api' && <NocoDbPlaceholder target={selected} />}
+        {selected?.type === 'iframe' && <IframeEmbed target={selected} />}
+        {selected?.type === 'api' && <NocoDbTableEmbed target={selected} />}
       </div>
     </div>
   );

@@ -26,5 +26,7 @@ export const adminApi = {
     apiClient.post<{ user: AdminUser }>(`/admin/users/${id}/deactivate`, {}),
   reactivateUser: (id: string) =>
     apiClient.post<{ user: AdminUser }>(`/admin/users/${id}/reactivate`, {}),
+  deleteUser: (id: string) =>
+    apiClient.delete<{ user: AdminUser }>(`/admin/users/${id}`),
   listAudit: () => apiClient.get<{ entries: AuditLogEntry[] }>('/admin/audit')
 };

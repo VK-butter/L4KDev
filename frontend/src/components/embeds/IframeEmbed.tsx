@@ -1,10 +1,10 @@
 import type { EmbeddingTarget } from '@shared/index';
 
-interface SupersetEmbedProps {
+interface IframeEmbedProps {
   target: EmbeddingTarget;
 }
 
-export function SupersetEmbed({ target }: SupersetEmbedProps) {
+export function IframeEmbed({ target }: IframeEmbedProps) {
   return (
     <div className="h-full w-full rounded-2xl border border-emerald-100 bg-white shadow-sm">
       <header className="border-b border-emerald-50 px-6 py-4">
@@ -17,9 +17,11 @@ export function SupersetEmbed({ target }: SupersetEmbedProps) {
         <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-700">
           <p className="font-semibold">Integration notes</p>
           <p>{target.integrationNotes}</p>
-          <p className="mt-2 text-xs text-emerald-500">
-            Replace iframe `src` with live Superset URL once SSH tunnel is ready.
-          </p>
+          {target.status !== 'ready' && (
+            <p className="mt-2 text-xs text-emerald-500">
+              Replace the iframe source with the live integration URL once credentials are ready.
+            </p>
+          )}
         </div>
         <div className="mt-4 h-80 overflow-hidden rounded-xl border border-emerald-50 shadow-inner">
           <iframe

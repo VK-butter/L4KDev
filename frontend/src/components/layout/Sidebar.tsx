@@ -6,21 +6,36 @@ interface SidebarProps {
   user?: SessionUser | null;
 }
 
+type NavItem =
+  | { label: string; to: string }
+  | { label: string; href: string }
+  | { label: string };
+
 export function Sidebar({ user }: SidebarProps) {
-  const navGroups = [
+
+  const navGroups: Array<{ title: string; items: NavItem[] }> = [
     {
       title: 'Dashboards',
-      items: ['Sale order line', 'Inventory', 'Channel Mix']
+      items: [
+        { label: 'Sale order line', to: '/dashboards/sales' },
+        { label: 'Inventory' },
+        { label: 'Product Sku' }
+      ]
     },
     {
-      title: 'Embeds',
-      items: ['Superset Placeholder', 'NocoDB Placeholder']
+      title: 'NOCODB MASTER',
+      items: [
+        { label: 'ฐานข้อมูลสินค้า', to: '/nocodb?embed=nocodb-products' },
+        { label: 'ประเภทลูกค้า', to: '/nocodb?embed=nocodb-customer-types' },
+        { label: 'Condition SKU', to: '/nocodb?embed=nocodb-condition-sku' },
+        { label: 'เป้ายอดขาย', to: '/nocodb?embed=nocodb-sales-target' }
+      ]
     },
     ...(user?.role === 'admin'
       ? [
           {
             title: 'Admin',
-            items: ['Account Management', 'Audit Trail']
+            items: [{ label: 'Account Management' }, { label: 'Audit Trail' }]
           }
         ]
       : [])
@@ -40,22 +55,33 @@ export function Sidebar({ user }: SidebarProps) {
           </p>
           <ul className="mt-3 space-y-1" role="list">
             {group.items.map((item) => (
-              <li key={item}>
-                {item === 'Sale order line' ? (
+              <li key={item.label}>
+                {'to' in item ? (
                   <Link
-                    to="/dashboards/sales"
+                    to={item.to}
                     className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-                    aria-label={item}
+                    aria-label={item.label}
                   >
-                    {item}
+                    {item.label}
                   </Link>
+                ) : 'href' in item ? (
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                    aria-label={`${item.label} (opens new tab)`}
+                  >
+                    {item.label}
+                  </a>
                 ) : (
                   <button
                     type="button"
-                    className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-                    aria-label={item}
+                    className="w-full cursor-not-allowed rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-400"
+                    aria-label={item.label}
+                    disabled
                   >
-                    {item}
+                    {item.label}
                   </button>
                 )}
               </li>

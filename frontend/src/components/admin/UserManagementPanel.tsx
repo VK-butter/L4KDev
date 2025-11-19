@@ -97,6 +97,14 @@ export function UserManagementPanel({
     await refreshUsers();
   };
 
+  const deleteUserAccount = async (user: AdminUser) => {
+    if (user.status !== 'inactive') {
+      return;
+    }
+    await adminApi.deleteUser(user.id);
+    await refreshUsers();
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -198,7 +206,7 @@ export function UserManagementPanel({
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-emerald-600">
+                      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-xs font-semibold uppercase tracking-widest text-emerald-600">
                         <button
                           type="button"
                           onClick={() => openEditModal(user)}
@@ -215,6 +223,17 @@ export function UserManagementPanel({
                         >
                           {user.status === 'active' ? 'Deactivate' : 'Reactivate'}
                         </button>
+                        {user.status === 'inactive' && (
+                          <button
+                            type="button"
+                            onClick={() => deleteUserAccount(user)}
+                            data-username={user.username}
+                            data-testid="delete-user-button"
+                            className="text-red-500 hover:text-red-600"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

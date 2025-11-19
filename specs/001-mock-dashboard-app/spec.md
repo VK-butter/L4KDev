@@ -12,7 +12,7 @@
 - Authenticated shell delivered: login page, session guard, protected routes, role-aware Admin menu.
 - Admin user management: add/edit/deactivate/reactivate with audit log; UI wired to backend admin APIs.
 - Sales analytics workspace: date filters, KPI board, revenue-by-category bar, revenue trend, drill-down table with pagination; interactive category drill and status filters.
-- Embeds playground: Superset iframe + NocoDB placeholder with error handling and integration notes; SSH tunnel helper UI.
+- Embeds playground: Superset iframe placeholder plus inline NocoDB share views rendered inside the app (no redirects) with notes on when to switch to API/webhook integrations; SSH tunnel helper UI.
 - Backend implemented: Express server, session middleware, mock data layer, analytics routes (`/api/analytics/orders/raw`, `/raw/summary`, `/raw/status`), admin routes, auth routes.
 - Environment & deployment: `.env` instructions synced with `quickstart.md`; production-ready Dockerfiles, compose stack, environment templates, and the `deployment/` checklist + host runbook now cover end-to-end rollout.
 - Testing: lint + unit + Playwright E2E all passing per tasks log.
@@ -68,7 +68,7 @@ An analyst uses the Sales Order Analysis Dashboard to view mock metrics (orders,
 
 ### User Story 4 - Preview embedded external dashboards (Priority: P4)
 
-An integrations engineer selects an “Embedded Sources” tab to preview placeholders for Apache Superset and NocoDB dashboards, ensuring the layout supports future iframe/API embeds and annotates where upstream files were extended.
+An integrations engineer selects an “Embedded Sources” tab to preview inline (non-redirecting) NocoDB dashboards plus the Superset placeholder, ensuring the layout hosts external BI assets inside the shell while documenting how to swap in API/webhook-driven experiences later.
 
 **Why this priority**: Confirms the application can host external BI assets and documents integration points without requiring live services now.
 
@@ -77,7 +77,8 @@ An integrations engineer selects an “Embedded Sources” tab to preview placeh
 **Acceptance Scenarios**:
 
 1. **Given** the analyst navigates to the Superset embed card, **When** the placeholder loads, **Then** it displays a mock iframe plus a caption describing how to configure the future Superset URL and SSH-tunneled credentials.
-2. **Given** the analyst opens the NocoDB tile, **When** the component fetches mock API data, **Then** it renders a chart using the modular embedding service and surfaces doc links referencing the original GitHub files touched.
+2. **Given** the analyst opens the NocoDB tile that points at a share link, **When** the embed tab becomes active, **Then** the table renders inline via iframe within the dashboard instead of redirecting to a new tab and clearly states the governing share URL.
+3. **Given** the analyst switches to a NocoDB tab configured for API-driven charts, **When** the mock service responds, **Then** the card shows retry/error messaging plus notes comparing iframe embeds vs. REST/webhook integrations for future work.
 
 ---
 
@@ -105,6 +106,17 @@ An integrations engineer selects an “Embedded Sources” tab to preview placeh
 - **FR-010**: Codebase MUST remain modular with separate folders/modules for front-end shell, back-end services, data layer/mocks, and embedding adapters, matching or extending Sale-Dashboard-prototype-Embeded structure.
 - **FR-011**: Updated or replaced files originating from the GitHub starter repo MUST include inline comments or README notes documenting what changed and why.
 - **FR-012**: System MUST include automated or documented manual test steps for each user story so QA can validate without real external systems.
+- **FR-013**: External NocoDB experiences MUST render inline within the application (iframe or API-driven component) rather than redirecting users away, and documentation MUST compare when to prefer iframe shares, REST polling, or webhooks for change notifications.
+
+### NocoDB Integration Approach
+
+- **Inline iframe (default)**: Use NocoDB's shared view URL directly inside the embed module. Pros: no backend work, reflects all filtering done in NocoDB, zero redirect. Cons: limited styling, requires public or tokenized shares—rotate links if leaked.
+- **REST API**: Authenticate with a Personal Access Token and call `/api/v2/tables/{table}/records` (or views) from the backend, then render React components with that data. Pros: full UX control, can blend datasets, enforce RBAC. Cons: must secure tokens, handle pagination/caching, slightly higher latency.
+- **Webhooks/Automations**: Configure NocoDB automations to POST into the backend when tables change. Pros: event-driven updates, good for syncing into warehouses. Cons: requires public webhook endpoint and replay handling.
+
+Decision: For this mock, iframe embedding keeps tables visible inside the dashboard immediately, while docs highlight how/when to escalate to API or webhook-based integrations so future engineers can choose the right method.
+
+**Environment**: Backend needs `NOCODB_BASE_URL` (hosted instance) and `NOCODB_API_TOKEN` (PAT with read access) so it can proxy REST calls without exposing secrets to the browser.
 
 ### Key Entities *(include if feature involves data)*
 

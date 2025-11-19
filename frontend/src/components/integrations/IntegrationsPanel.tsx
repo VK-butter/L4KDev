@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { integrationsApi, type IntegrationStatus, supersetIntegrationApi, type SupersetConfigPayload } from '../../services/integrationsApi';
+import {
+  integrationsApi,
+  type IntegrationStatus,
+  supersetIntegrationApi,
+  type SupersetConfigPayload,
+  nocodbIntegrationApi,
+  type NocoDbStatusResponse
+} from '../../services/integrationsApi';
 
 type ConnectorKey = 'postgres' | 'nocodb' | 'superset';
 
@@ -34,6 +41,14 @@ export function IntegrationsPanel() {
   const [addDashOpen, setAddDashOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ title: string; url: string }>({ title: '', url: '' });
+  const [nocodbForm, setNocodbForm] = useState<{ baseUrl: string; username: string; password: string }>({
+    baseUrl: '',
+    username: '',
+    password: ''
+  });
+  const [nocodbStatus, setNocodbStatus] = useState<NocoDbStatusResponse | null>(null);
+  const [savingNocodb, setSavingNocodb] = useState(false);
+  const [nocodbMsg, setNocodbMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -46,6 +61,17 @@ export function IntegrationsPanel() {
           if (!ignore) setSupersetStatus(s.data);
           const d = await supersetIntegrationApi.listDashboards();
           if (!ignore) setDashboards(d.data.dashboards);
+        } catch {
+          // ignore
+        }
+        try {
+          const r = await nocodbIntegrationApi.status();
+          if (!ignore) {
+            setNocodbStatus(r.data);
+            if (r.data.baseUrl) {
+              setNocodbForm((prev) => ({ ...prev, baseUrl: r.data.baseUrl }));
+            }
+          }
         } catch {
           // ignore
         }
@@ -324,10 +350,80 @@ export function IntegrationsPanel() {
           )}
 
           {!loading && !error && selected === 'nocodb' && (
-            <div className="space-y-3 text-sm text-emerald-900">
-              <p className="text-xs uppercase tracking-widest text-emerald-500">NocoDB</p>
-              <h4 className="text-lg font-semibold text-emerald-900">Connection (coming soon)</h4>
-              <p>We will surface a similar editor here for NocoDB API base URL, auth token, and dataset mapping, with test and status indicators.</p>
+            <div className="space-y-4 text-sm text-emerald-900">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-emerald-500">NocoDB</p>
+                <h4 className="text-lg font-semibold text-emerald-900">Account for inline embeds</h4>
+                <p className="mt-1 text-emerald-700">
+                  Store the service account that our backend should use when fetching tables or generating redirect helpers.
+                  We save this locally in <code>backend/.data/integrations.json</code>.
+                </p>
+                {nocodbStatus?.configured && (
+                  <p className="mt-1 text-xs text-emerald-500">
+                    Configured for {nocodbStatus.usernameMasked ?? 'service user'} at {nocodbStatus.baseUrl}
+                  </p>
+                )}
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="text-xs text-emerald-700">Base URL
+                  <input
+                    className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2"
+                    placeholder="https://db.learningforkidz.com"
+                    value={nocodbForm.baseUrl}
+                    onChange={(e) => setNocodbForm((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                  />
+                </label>
+                <label className="text-xs text-emerald-700">Account (email or username)
+                  <input
+                    className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2"
+                    value={nocodbForm.username}
+                    onChange={(e) => setNocodbForm((prev) => ({ ...prev, username: e.target.value }))}
+                  />
+                </label>
+                <label className="text-xs text-emerald-700">Password
+                  <input
+                    type="password"
+                    className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2"
+                    value={nocodbForm.password}
+                    onChange={(e) => setNocodbForm((prev) => ({ ...prev, password: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
+                  onClick={async () => {
+                    setSavingNocodb(true);
+                    setNocodbMsg(null);
+                    try {
+                      await nocodbIntegrationApi.saveConfig(nocodbForm);
+                      setNocodbStatus({
+                        configured: true,
+                        baseUrl: nocodbForm.baseUrl,
+                        usernameMasked: `${nocodbForm.username.slice(0, 1)}***${nocodbForm.username.slice(-1)}`
+                      });
+                      setNocodbForm((prev) => ({ ...prev, password: '' }));
+                      setNocodbMsg('Credentials saved');
+                    } catch (err) {
+                      setNocodbMsg(
+                        err instanceof Error ? err.message : 'Failed to save credentials'
+                      );
+                    } finally {
+                      setSavingNocodb(false);
+                    }
+                  }}
+                  disabled={savingNocodb}
+                >
+                  {savingNocodb ? 'Saving…' : 'Save credentials'}
+                </button>
+                {nocodbMsg && (
+                  <p className="text-xs text-emerald-600">{nocodbMsg}</p>
+                )}
+              </div>
+              <p className="text-xs text-emerald-600">
+                Tip: once saved, the “Open in NocoDB” buttons on each table will launch the shared view in a new tab using the base URL above.
+              </p>
             </div>
           )}
 

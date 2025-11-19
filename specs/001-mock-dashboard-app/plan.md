@@ -5,7 +5,7 @@
 
 ## Summary
 
-Build a green-themed mock web application that reuses the Sale-Dashboard-prototype-Embeded structure while adding authenticated access, an admin-only account management menu in the top bar, a modular sales analytics workspace with interactive filters/drill downs, and embed placeholders for Apache Superset and NocoDB, all backed by a mock data/service layer that simulates a future PostgreSQL-over-SSH connection.
+Build a green-themed mock web application that reuses the Sale-Dashboard-prototype-Embeded structure while adding authenticated access, an admin-only account management menu in the top bar, a modular sales analytics workspace with interactive filters/drill downs, and inline embedded NocoDB dashboards (plus Superset placeholder guidance), all backed by a mock data/service layer that simulates a future PostgreSQL-over-SSH connection.
 
 ## Current Progress (2025-11-17)
 
@@ -18,7 +18,7 @@ Build a green-themed mock web application that reuses the Sale-Dashboard-prototy
   - App shell with top nav + sidebar; protected routing and session hooks.
   - Sales dashboard with date filters, KPIs, charts (Recharts), and drill-down table.
   - Admin UI (panels/modals) with form validation and optimistic updates.
-  - Embeds (Superset iframe, NocoDB placeholder) + SSH helper; error handling UX.
+- Embeds (Superset iframe placeholder, live NocoDB share-view iframes, plus notes on REST/webhook upgrades) + SSH helper; error handling UX.
 - Deployment/Docs
   - Production Dockerfiles for backend/frontend, `deployment/docker-compose.yml`, env templates, operator checklist, and host runbook ready for hand-off.
   - Quickstart instructions updated to mirror `.env` requirements; plan/spec/tasks/checklist aligned.
@@ -41,6 +41,12 @@ Next
 **Constraints**: No real network dependencies; embed components must fail gracefully; role-aware menu must never expose admin controls to analysts  
 **Scale/Scope**: Single demo environment with ≤10 mock users, <10 charts, and modular packages ready for future integration
 
+## NocoDB Embedding Recommendation
+
+- **Default path**: Use NocoDB's shared view links inside iframe embeds so analysts never leave the dashboard; rotate the share link if leaked.
+- **API upgrade**: When custom UI/filters are required, call NocoDB REST endpoints from the backend (with PAT) and feed the dashboard via our existing embedding API interface.
+- **Webhook option**: For downstream syncing, enable NocoDB automations to hit backend webhook endpoints which hydrate local stores before rendering.
+- Document these trade-offs in the embed module README so engineers know when to transition away from the simple iframe approach, and store credentials in `NOCODB_BASE_URL` / `NOCODB_API_TOKEN` env vars so only the backend touches secrets.
 ## Constitution Check
 
 The constitution file is still the scaffolded template with no ratified principles, so there are currently **no enforceable constraints** to validate against. Gate passes with the note that we must revisit once the project defines real principles. Post–Phase 1 (after research, data model, contracts, and agent-context updates) there remain no stated principles, so the gate continues to pass unchanged.

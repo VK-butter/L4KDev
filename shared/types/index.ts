@@ -63,6 +63,11 @@ export interface EmbeddingTarget {
   placeholderUrl: string;
   status: 'placeholder' | 'ready' | 'blocked';
   integrationNotes?: string;
+  viewId?: string;
+  projectSlug?: string;
+  tableSlug?: string;
+  defaultLimit?: number;
+  manageUrl?: string;
 }
 
 export interface AuditLogEntry {

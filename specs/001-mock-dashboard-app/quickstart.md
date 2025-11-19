@@ -61,8 +61,8 @@
    ```
 
 8. **Embedding configuration**
-   - Update `shared/config/embeds.ts` to point Superset iframe to the eventual SSH-tunneled URL.
-   - Update `backend/src/services/embeds/nocodb.ts` with the real API base when available.
+   - Update `shared/config/embeds.ts` to add/remove embed targets (Superset iframe metadata, NocoDB view IDs, project/table slugs, and default limits).
+   - Store credentials in `backend/.env` using `NOCODB_BASE_URL` (e.g., `https://db.learningforkidz.com`) and `NOCODB_API_TOKEN` (PAT with read access). The backend proxy at `/api/analytics/embeds/nocodb/:id/records` handles all REST calls so the browser never sees secrets.
 
 9. **Environment variables**
    - Create `backend/.env` with:
@@ -100,7 +100,7 @@
     5. Use the pagination controls in the drill-down panel to move between pages and confirm results change accordingly.
 
 12. **Manual verification – User Story 4**
-    1. Scroll to “Embedding Playground” on the dashboard and confirm the Superset and NocoDB tabs appear.
-    2. Select the Superset tab and ensure the iframe renders plus the integration note describing SSH-tunnel configuration.
-    3. Select the NocoDB tab and confirm the mock chart loads; if you disable the backend endpoint, verify the UI surfaces an error message without breaking the page.
-    4. Review `frontend/src/components/embeds/README.md` and confirm it explains how to replace placeholders with real endpoints.
+    1. Scroll to “Embedding Playground” on the dashboard and confirm the NocoDB tabs render.
+    2. Select each tab and ensure the inline table loads data via the backend proxy (rows update when you refresh the card; errors surface inline without crashing the page).
+    3. If you still need the Superset placeholder, ensure its iframe renders plus the integration note describing SSH tunnel configuration.
+    4. Review `frontend/src/components/embeds/README.md` and confirm it explains the iframe vs. API approach along with the required env vars.

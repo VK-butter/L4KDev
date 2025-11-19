@@ -154,4 +154,32 @@ router.delete('/superset/dashboards/:id', async (req, res) => {
     await saveStore(store);
     res.json({ ok: true });
 });
+router.post('/nocodb/config', async (req, res) => {
+    const { baseUrl, username, password } = req.body || {};
+    if (typeof baseUrl !== 'string' ||
+        typeof username !== 'string' ||
+        typeof password !== 'string') {
+        return res.status(400).json({ error: 'INVALID_PAYLOAD' });
+    }
+    const store = await loadStore();
+    store.nocodb = {
+        baseUrl,
+        username,
+        password
+    };
+    await saveStore(store);
+    res.json({ ok: true });
+});
+router.get('/nocodb/status', async (_req, res) => {
+    const store = await loadStore();
+    if (!store.nocodb) {
+        return res.json({ configured: false });
+    }
+    const { baseUrl, username } = store.nocodb;
+    res.json({
+        configured: true,
+        baseUrl,
+        usernameMasked: `${username.slice(0, 1)}***${username.slice(-1)}`
+    });
+});
 export default router;

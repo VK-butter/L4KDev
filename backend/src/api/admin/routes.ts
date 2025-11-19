@@ -8,7 +8,8 @@ import {
   createUser,
   listUsers,
   setUserStatus,
-  updateUser
+  updateUser,
+  deleteUser
 } from '../../services/admin/userDirectoryService';
 import { listAuditEntries } from '../../services/admin/auditLogService';
 
@@ -82,6 +83,17 @@ router.post('/users/:id/reactivate', async (req, res, next) => {
     const userId = z.string().parse(req.params.id);
     const actorId = req.session!.user!.id;
     const user = await setUserStatus(actorId, userId, 'active');
+    res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/users/:id', async (req, res, next) => {
+  try {
+    const userId = z.string().parse(req.params.id);
+    const actorId = req.session!.user!.id;
+    const user = await deleteUser(actorId, userId);
     res.json({ user });
   } catch (error) {
     next(error);

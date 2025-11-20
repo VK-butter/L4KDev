@@ -1,1 +1,9 @@
 node_modules
+.codex/
+.env
+*.env
+*.env.local
+deployment/.env
+deployment/env/backend.env
+frontend/test-results/
+frontend/dist/

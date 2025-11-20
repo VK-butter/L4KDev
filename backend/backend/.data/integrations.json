@@ -15,5 +15,10 @@
         "url": "https://bi.staff.thaiadapp.com/superset/dashboard/9/?native_filters_key=UIRNz6wqhshoVWJIirMSn5VhbWY4IhH2KuLWKuDy8w2Ke5-wSGRWMvVx9W3b53Jg&standalone=true"
       }
     ]
+  },
+  "nocodb": {
+    "baseUrl": "https://db.learningforkidz.com/",
+    "username": "learningforkidz.th@gmail.com",
+    "password": "}eo63<cn+Ohci9L~>1F;"
   }
 }

@@ -8,14 +8,6 @@
     "passwordHash": "plain:TempPass!123"
   },
   {
-    "id": "f2b2038b-7eda-4e2f-8d7d-fa5a96c1a66c",
-    "username": "autotest+1762836309214@example.com",
-    "displayName": "QA User 1762836309214",
-    "role": "analyst",
-    "status": "inactive",
-    "passwordHash": "plain:TempPass!123"
-  },
-  {
     "id": "263fdbca-6a33-4637-9112-b350e52f953c",
     "username": "autotest+1762836275877@example.com",
     "displayName": "QA User 1762836275877",

@@ -11,7 +11,6 @@ import { KpiBoard } from '../components/analytics/KpiBoard';
 import { RevenueByCategoryChart } from '../components/analytics/RevenueByCategoryChart';
 import { RevenueTrendChart } from '../components/analytics/RevenueTrendChart';
 import { OrderDrilldownPanel } from '../components/analytics/OrderDrilldownPanel';
-import { EmbedSwitcher } from '../components/embeds/EmbedSwitcher';
 import { RawDbPreview } from '../components/analytics/RawDbPreview';
 
 const STATUS_OPTIONS = ['Pending', 'Fulfilled', 'Cancelled'];
@@ -174,7 +173,10 @@ export function DashboardHome() {
       {/* Always show DB preview at top (SELECT * pagination) */}
       <RawDbPreview />
 
-      <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+      <section
+        id="embedding-playground"
+        className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm"
+      >
         <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-widest text-emerald-500">
@@ -272,21 +274,6 @@ export function DashboardHome() {
         onPageChange={setDrilldownPage}
       />
 
-      {/* DB preview moved to top */}
-
-      <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
-        <header className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-emerald-500">
-              External dashboards
-            </p>
-            <h3 className="text-xl font-semibold text-emerald-900">
-              Embedding Playground
-            </h3>
-          </div>
-        </header>
-        <EmbedSwitcher />
-      </section>
     </div>
   );
 }

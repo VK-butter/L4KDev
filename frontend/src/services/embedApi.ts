@@ -5,10 +5,20 @@ export interface EmbedMetadataResponse {
   embeds: EmbeddingTarget[];
 }
 
+export interface NocoDbRecordsResponse {
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+  meta?: Record<string, unknown>;
+}
+
 export const embedApi = {
   list: () => apiClient.get<EmbedMetadataResponse>('/analytics/embeds'),
-  nocodbPlaceholder: () =>
-    apiClient.get<{ title: string; values: Array<{ week: string; orders: number }> }>(
-      '/analytics/embeds/nocodb-placeholder'
+  fetchNocoRecords: (
+    targetId: string,
+    params?: { limit?: number; offset?: number }
+  ) =>
+    apiClient.get<NocoDbRecordsResponse>(
+      `/analytics/embeds/nocodb/${encodeURIComponent(targetId)}/records`,
+      { params }
     )
 };

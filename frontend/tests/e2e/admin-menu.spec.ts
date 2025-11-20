@@ -41,6 +41,8 @@ test.describe('Admin menu account management', () => {
 
     await newRow.getByTestId('toggle-user-button').click();
     await expect(newRow.getByText(/inactive/i)).toBeVisible();
+    await newRow.getByTestId('delete-user-button').click();
+    await expect(newRow).toHaveCount(0);
 
     await page.getByRole('button', { name: /close/i }).click();
     await expect(page.getByTestId('admin-panel')).not.toBeVisible();

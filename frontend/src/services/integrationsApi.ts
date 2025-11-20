@@ -36,6 +36,12 @@ export interface SupersetStatusResponse {
   error?: string;
 }
 
+export interface NocoDbStatusResponse {
+  configured: boolean;
+  baseUrl?: string;
+  usernameMasked?: string;
+}
+
 export const supersetIntegrationApi = {
   saveConfig: (payload: SupersetConfigPayload) =>
     apiClient.post('/integrations/superset/config', payload),
@@ -54,4 +60,10 @@ export const supersetIntegrationApi = {
       payload
     ),
   deleteDashboard: (id: string) => apiClient.delete(`/integrations/superset/dashboards/${id}`)
+};
+
+export const nocodbIntegrationApi = {
+  saveConfig: (payload: { baseUrl: string; username: string; password: string }) =>
+    apiClient.post('/integrations/nocodb/config', payload),
+  status: () => apiClient.get<NocoDbStatusResponse>('/integrations/nocodb/status')
 };

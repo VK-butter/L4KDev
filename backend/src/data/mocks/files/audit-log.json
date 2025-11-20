@@ -1,5 +1,29 @@
 [
   {
+    "id": "190439c0-4c1f-4f69-9acc-d1d0db6400db",
+    "timestamp": "2025-11-18T13:22:25.233Z",
+    "actorId": "user-admin-001",
+    "action": "reactivate",
+    "targetUserId": "75defaca-6367-4ecc-be2b-98500cd7a1c8",
+    "details": "Reactivated user"
+  },
+  {
+    "id": "4229ef60-d09a-4683-96d8-7c9a46e0144e",
+    "timestamp": "2025-11-18T13:22:24.043Z",
+    "actorId": "user-admin-001",
+    "action": "deactivate",
+    "targetUserId": "75defaca-6367-4ecc-be2b-98500cd7a1c8",
+    "details": "Deactivated user"
+  },
+  {
+    "id": "5e3a28ff-cc17-4183-950a-1db187600bec",
+    "timestamp": "2025-11-18T13:22:03.389Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "f2b2038b-7eda-4e2f-8d7d-fa5a96c1a66c",
+    "details": "Deleted user autotest+1762836309214@example.com"
+  },
+  {
     "id": "e3acadd0-f1fc-4f65-988c-2bb371ea4bba",
     "timestamp": "2025-11-12T09:22:34.329Z",
     "actorId": "user-admin-001",

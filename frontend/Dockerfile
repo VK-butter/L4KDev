@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1.6
 FROM node:20-alpine AS build
 WORKDIR /app
-ENV NODE_ENV=production
 RUN apk add --no-cache libc6-compat \
   && corepack enable
 

@@ -105,9 +105,16 @@
 - [x] T037 [US4] Define embed metadata config in `shared/config/embeds.ts` plus loader in `backend/src/services/embeds/embedRegistry.ts`.
 - [x] T038 [US4] Add backend endpoint `backend/src/api/analytics/embedRoutes.ts` that serves embed metadata/status.
 - [x] T039 [US4] Build Superset iframe wrapper `frontend/src/components/embeds/SupersetEmbed.tsx` with caption + SSH/URL instructions.
-- [x] T040 [US4] Build NocoDB card `frontend/src/components/embeds/NocoDbPlaceholder.tsx` that fetches mock API data and renders a chart via Recharts.
+- [x] T040 [US4] Build NocoDB card `frontend/src/components/embeds/NocoDbTableEmbed.tsx` that proxies through the backend and renders live records.
 - [x] T041 [US4] Implement resilient embedding module controller `frontend/src/components/embeds/EmbedSwitcher.tsx` handling timeouts + retry messaging.
 - [x] T042 [US4] Update developer notes in `frontend/src/components/embeds/README.md` documenting swap steps per SC-005.
+
+### Upcoming Enhancements (Iframe NocoDB embeds)
+
+- [ ] T049 [US4] Replace embed metadata entries in `shared/config/embeds.ts` (and compiled mirrors) with the four provided NocoDB share-link iframes so tabs render live tables.
+- [ ] T050 [US4] Generalize `frontend/src/components/embeds/SupersetEmbed.tsx` to `IframeEmbed.tsx` and update `EmbedSwitcher` to consume it for all iframe targets.
+- [ ] T051 [US4] Update `frontend/src/components/layout/Sidebar.tsx` to rename the “Embeds” group to “NOCODB MASTER” and link each entry to the corresponding NocoDB dashboard in a new tab.
+- [ ] T052 [US4] Document the iframe-vs-API/webhook decision and manual verification steps in `specs/001-mock-dashboard-app/spec.md` + `plan.md`.
 
 **Checkpoint**: Embedding placeholders operate independently with clear documentation.
 

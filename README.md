@@ -1,4 +1,4 @@
-# Green Sales Dashboard Mock App 20/11/2025
+# Green Sales Dashboard Mock App 21/11/2025
 
 Modular React + Node monorepo that re-imagines the Sale-Dashboard-prototype-Embeded repo with a green-themed UI, authenticated shell, admin tooling, analytics workspace, and external embedding playground. All data and integrations are mocked locally so the experience can be demoed offline while preserving a clean hand-off path to Superset/NocoDB + PostgreSQL over SSH.
 

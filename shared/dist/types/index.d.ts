@@ -65,7 +65,7 @@ export interface EmbeddingTarget {
 export interface AuditLogEntry {
     id: string;
     actorId: string;
-    action: 'create' | 'update' | 'deactivate' | 'reactivate';
+    action: 'create' | 'update' | 'deactivate' | 'reactivate' | 'delete';
     targetUserId: string;
     timestamp: string;
     details?: string;

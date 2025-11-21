@@ -69,7 +69,7 @@ export function IntegrationsPanel() {
           if (!ignore) {
             setNocodbStatus(r.data);
             if (r.data.baseUrl) {
-              setNocodbForm((prev) => ({ ...prev, baseUrl: r.data.baseUrl }));
+              setNocodbForm((prev) => ({ ...prev, baseUrl: r.data.baseUrl ?? '' }));
             }
           }
         } catch {

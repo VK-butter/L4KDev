@@ -95,3 +95,23 @@ export async function setUserStatus(actorId, userId, status) {
     });
     return sanitize(updated);
 }
+export async function deleteUser(actorId, userId) {
+    const users = await mockDataStore.getUsers();
+    const index = users.findIndex((user) => user.id === userId);
+    if (index === -1) {
+        throw Object.assign(new Error('USER_NOT_FOUND'), { status: 404 });
+    }
+    const target = users[index];
+    if (target.status !== 'inactive') {
+        throw Object.assign(new Error('USER_NOT_INACTIVE'), { status: 400 });
+    }
+    const remaining = users.filter((user) => user.id !== userId);
+    await mockDataStore.saveUsers(remaining);
+    await recordAuditEvent({
+        actorId,
+        action: 'delete',
+        targetUserId: target.id,
+        details: `Deleted user ${target.username}`
+    });
+    return sanitize(target);
+}

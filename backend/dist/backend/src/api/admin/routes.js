@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../../middleware/session';
-import { createUser, listUsers, setUserStatus, updateUser } from '../../services/admin/userDirectoryService';
+import { createUser, listUsers, setUserStatus, updateUser, deleteUser } from '../../services/admin/userDirectoryService';
 import { listAuditEntries } from '../../services/admin/auditLogService';
 const router = Router();
 router.use(requireAuth, requireRole('admin'));
@@ -67,6 +67,17 @@ router.post('/users/:id/reactivate', async (req, res, next) => {
         const userId = z.string().parse(req.params.id);
         const actorId = req.session.user.id;
         const user = await setUserStatus(actorId, userId, 'active');
+        res.json({ user });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.delete('/users/:id', async (req, res, next) => {
+    try {
+        const userId = z.string().parse(req.params.id);
+        const actorId = req.session.user.id;
+        const user = await deleteUser(actorId, userId);
         res.json({ user });
     }
     catch (error) {

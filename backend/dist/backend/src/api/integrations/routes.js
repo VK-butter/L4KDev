@@ -10,7 +10,11 @@ async function ensureDataDir() {
     try {
         await fs.mkdir(DATA_DIR, { recursive: true });
     }
-    catch { }
+    catch (error) {
+        if (error.code !== 'EEXIST') {
+            throw error;
+        }
+    }
 }
 async function loadStore() {
     try {

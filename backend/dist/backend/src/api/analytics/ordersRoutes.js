@@ -97,11 +97,16 @@ router.get('/orders/raw', async (req, res, next) => {
                 .string()
                 .optional()
                 .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd'),
-            status: z.string().optional()
+            status: z.string().optional(),
+            q: z.string().optional()
         })
             .parse(req.query);
         const page = Math.max(querySchema.page ?? 1, 1);
-        const pageSize = Math.min(Math.max(querySchema.pageSize ?? 50, 1), 500);
+        const maxPageSize = (() => {
+            const v = Number(process.env.RAW_MAX_PAGE_SIZE ?? '1000');
+            return Number.isFinite(v) && v > 0 ? Math.floor(v) : 1000;
+        })();
+        const pageSize = Math.min(Math.max(querySchema.pageSize ?? 50, 1), maxPageSize);
         const offset = (page - 1) * pageSize;
         const client = await getPool().connect();
         try {
@@ -141,6 +146,43 @@ router.get('/orders/raw', async (req, res, next) => {
             if (statusColumn && querySchema.status) {
                 parts.push(`${statusColumn} = $${params.length + 1}`);
                 params.push(querySchema.status);
+            }
+            // Optional keyword search across common text-like columns
+            const rawQ = querySchema.q?.trim();
+            if (rawQ && rawQ.length > 0) {
+                const q = `%${rawQ}%`;
+                const preferred = [
+                    'order_name',
+                    'customer',
+                    'status',
+                    'product_name',
+                    'description',
+                    'sku',
+                    'รหัส',
+                    'หมวดสินค้า',
+                    'สถานะ',
+                    'ลูกค้า'
+                ];
+                const namesSet = new Set(fieldNames);
+                const chosen = [];
+                for (const p of preferred)
+                    if (namesSet.has(p))
+                        chosen.push(p);
+                for (const n of fieldNames) {
+                    if (chosen.length >= 6)
+                        break;
+                    if (!chosen.includes(n))
+                        chosen.push(n);
+                }
+                if (chosen.length > 0) {
+                    const orParts = [];
+                    for (const col of chosen.slice(0, 8)) {
+                        const qcol = '"' + col.replace(/"/g, '""') + '"';
+                        orParts.push(`CAST(${qcol} AS TEXT) ILIKE $${params.length + 1}`);
+                        params.push(q);
+                    }
+                    parts.push(`(${orParts.join(' OR ')})`);
+                }
             }
             const where = parts.length ? `WHERE ${parts.join(' AND ')}` : '';
             const countParams = [...params];
@@ -196,7 +238,7 @@ router.get('/orders/raw/summary', async (req, res, next) => {
                 const exact = fieldNames.find((n) => normalize(n) === 'orderdate');
                 chosenDate = exact ?? fieldNames.find((n) => normalize(n).includes('date')) ?? 'order_date';
             }
-            const dateColumn = '"' + chosenDate.replace(/\"/g, '\"\"') + '"';
+            const dateColumn = `"${chosenDate.replace(/"/g, '""')}"`;
             const envRev = process.env.RAW_REVENUE_COLUMN;
             const revCandidates = ['revenue', 'amount', 'price', 'totalprice', 'รวมราคา'];
             let chosenRev = envRev && envRev.trim().length > 0 ? envRev : '';
@@ -219,12 +261,14 @@ router.get('/orders/raw/summary', async (req, res, next) => {
             }
             const hasDateFilter = querySchema.dateStart && querySchema.dateEnd;
             const where = hasDateFilter ? `WHERE (${dateColumn}::date BETWEEN $1 AND $2)` : '';
-            const params = hasDateFilter ? [querySchema.dateStart, querySchema.dateEnd] : [];
+            const params = hasDateFilter
+                ? [querySchema.dateStart, querySchema.dateEnd]
+                : [];
             const selectParts = ['COUNT(*)::bigint AS cnt'];
             if (chosenRev)
-                selectParts.push(`SUM("${chosenRev.replace(/\"/g, '\"\"')}")::numeric AS revenue`);
+                selectParts.push(`SUM("${chosenRev.replace(/"/g, '""')}")::numeric AS revenue`);
             if (chosenQty)
-                selectParts.push(`SUM("${chosenQty.replace(/\"/g, '\"\"')}")::numeric AS quantity`);
+                selectParts.push(`SUM("${chosenQty.replace(/"/g, '""')}")::numeric AS quantity`);
             const sql = `SELECT ${selectParts.join(', ')} FROM l4k_model.joinsales_orderline ${where}`;
             const result = await client.query(sql, params);
             const row = result.rows[0] ?? {};
@@ -271,7 +315,7 @@ router.get('/orders/raw/status', async (req, res, next) => {
                 const exact = fieldNames.find((n) => normalize(n) === 'orderdate');
                 chosenDate = exact ?? fieldNames.find((n) => normalize(n).includes('date')) ?? 'order_date';
             }
-            const dateColumn = '"' + chosenDate.replace(/\"/g, '\"\"') + '"';
+            const dateColumn = `"${chosenDate.replace(/"/g, '""')}"`;
             // Status column detection
             const envStatus = process.env.RAW_STATUS_COLUMN;
             const statusCandidates = ['status', 'orderstatus', 'itemstatus', 'saled', 'sale_status', 'สถานะ'];
@@ -283,10 +327,12 @@ router.get('/orders/raw/status', async (req, res, next) => {
                 });
                 chosenStatus = match ?? 'status';
             }
-            const statusColumn = '"' + chosenStatus.replace(/\"/g, '\"\"') + '"';
+            const statusColumn = `"${chosenStatus.replace(/"/g, '""')}"`;
             const hasDateFilter = querySchema.dateStart && querySchema.dateEnd;
             const where = hasDateFilter ? `WHERE (${dateColumn}::date BETWEEN $1 AND $2)` : '';
-            const params = hasDateFilter ? [querySchema.dateStart, querySchema.dateEnd] : [];
+            const params = hasDateFilter
+                ? [querySchema.dateStart, querySchema.dateEnd]
+                : [];
             const sql = `SELECT ${statusColumn} AS status, COUNT(*)::bigint AS cnt FROM l4k_model.joinsales_orderline ${where} GROUP BY 1`;
             const result = await client.query(sql, params);
             const rows = result.rows.map((r) => ({ status: String(r.status ?? ''), count: Number(r.cnt ?? 0) }));

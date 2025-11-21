@@ -41,7 +41,7 @@ function normalizePayload(payload) {
     const meta = payload?.pageInfo ?? payload?.meta ?? payload?.pagination ?? undefined;
     return { columns, rows, meta, raw: payload };
 }
-export async function fetchNocoDbRecords(target, { limit, offset } = {}) {
+export async function fetchNocoDbRecords(target, { limit, offset }) {
     ensureConfig(target);
     const effectiveLimit = limit ?? target.defaultLimit ?? DEFAULT_LIMIT;
     const effectiveOffset = offset ?? 0;
@@ -68,6 +68,7 @@ export async function fetchNocoDbRecords(target, { limit, offset } = {}) {
     catch (error) {
         errors.push(error);
     }
-    const message = errors.map((err) => err.message).join('; ') || `Failed to load data for ${target.title}`;
+    const message = errors.map((err) => err.message).join('; ') ||
+        `Failed to load data for ${target.title}`;
     throw new Error(message);
 }

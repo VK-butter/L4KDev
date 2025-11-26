@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { getCategoryBreakdown, getDrilldown, getSummary, getTimeseries } from '../../services/analytics/salesQueryService';
 import { getPool } from '../../db/pool';
 const router = Router();
+const SKU_TABLES = {
+    current: 'l4k_model."SKU_dataCurrent"',
+    previous: 'l4k_model."SKU_dataPrevious"'
+};
 const isoDateSchema = z
     .string()
     .refine((value) => !Number.isNaN(Date.parse(value)), 'Invalid ISO date');
@@ -75,6 +79,204 @@ router.get('/orders/drilldown', async (req, res, next) => {
     }
 });
 export default router;
+function quoteIdent(name) {
+    return `"${name.replace(/"/g, '""')}"`;
+}
+const MONTH_ALIASES = [
+    { idx: 1, tokens: ['jan', 'january', 'มค', 'มกราคม', 'm1', 'm01', 'month1', 'month01', '01'] },
+    { idx: 2, tokens: ['feb', 'february', 'กพ', 'กุมภาพันธ์', 'm2', 'm02', 'month2', 'month02', '02'] },
+    { idx: 3, tokens: ['mar', 'march', 'มีค', 'มีนาคม', 'm3', 'm03', 'month3', 'month03', '03'] },
+    { idx: 4, tokens: ['apr', 'april', 'เมย', 'เมษายน', 'm4', 'm04', 'month4', 'month04', '04'] },
+    { idx: 5, tokens: ['may', 'พค', 'พฤษภาคม', 'm5', 'm05', 'month5', 'month05', '05'] },
+    { idx: 6, tokens: ['jun', 'june', 'มิย', 'มิถุนายน', 'm6', 'm06', 'month6', 'month06', '06'] },
+    { idx: 7, tokens: ['jul', 'july', 'กค', 'กรกฎาคม', 'm7', 'm07', 'month7', 'month07', '07'] },
+    { idx: 8, tokens: ['aug', 'august', 'สค', 'สิงหาคม', 'm8', 'm08', 'month8', 'month08', '08'] },
+    { idx: 9, tokens: ['sep', 'sept', 'september', 'กย', 'กันยายน', 'm9', 'm09', 'month9', 'month09', '09'] },
+    { idx: 10, tokens: ['oct', 'october', 'ตค', 'ตุลาคม', 'm10', 'month10'] },
+    { idx: 11, tokens: ['nov', 'november', 'พย', 'พฤศจิกายน', 'm11', 'month11'] },
+    { idx: 12, tokens: ['dec', 'december', 'ธค', 'ธันวาคม', 'm12', 'month12'] }
+];
+function monthLabel(idx) {
+    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (!idx || idx < 1 || idx > 12)
+        return 'Other';
+    return labels[idx - 1];
+}
+function normalizeKey(value) {
+    return value.toLowerCase().replace(/[^a-z0-9\u0e00-\u0e7f]/g, '');
+}
+function parseMonth(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        const n = Math.round(value);
+        return n >= 1 && n <= 12 ? n : null;
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        const n = Number(trimmed);
+        if (Number.isFinite(n) && n >= 1 && n <= 12)
+            return Math.round(n);
+        const norm = normalizeKey(trimmed);
+        const match = MONTH_ALIASES.find((m) => m.tokens.some((t) => norm === t || norm.endsWith(t) || norm.includes(t)));
+        if (match)
+            return match.idx;
+    }
+    return null;
+}
+function isQtyLike(name) {
+    const norm = normalizeKey(name);
+    return (norm.includes('qty') ||
+        norm.includes('quantity') ||
+        norm.includes('จำนวน') ||
+        norm.includes('ยอดขายจำนวน'));
+}
+function isAmountLike(name) {
+    const norm = normalizeKey(name);
+    return (norm.includes('ยอดรวม') ||
+        norm.includes('ยอดขาย') ||
+        norm.includes('ยอดสุทธิ') ||
+        norm.includes('ราคา') ||
+        norm.includes('amount') ||
+        norm.includes('total') ||
+        norm.includes('value') ||
+        norm.includes('price'));
+}
+function detectMonthLayout(fields) {
+    const monthColumns = [];
+    for (const f of fields) {
+        const norm = normalizeKey(f.name);
+        const matched = MONTH_ALIASES.find((m) => m.tokens.some((t) => norm === t || norm.endsWith(t) || norm.includes(t)));
+        if (matched) {
+            const isAmount = isAmountLike(f.name);
+            const entry = monthColumns.find((c) => c.monthIndex === matched.idx) ??
+                (() => {
+                    const fresh = { monthIndex: matched.idx };
+                    monthColumns.push(fresh);
+                    return fresh;
+                })();
+            if (isAmount)
+                entry.amountColumn = entry.amountColumn ?? f.name;
+            else
+                entry.qtyColumn = entry.qtyColumn ?? f.name;
+        }
+    }
+    if (monthColumns.length >= 3) {
+        const sorted = monthColumns.sort((a, b) => a.monthIndex - b.monthIndex);
+        return { type: 'columns', monthColumns: sorted };
+    }
+    const monthField = fields.find((f) => {
+        const norm = normalizeKey(f.name);
+        return norm.includes('month') || norm.includes('เดือน');
+    });
+    const qtyField = fields.find((f) => isQtyLike(f.name));
+    const amountField = fields.find((f) => isAmountLike(f.name));
+    if (monthField && (qtyField || amountField)) {
+        return {
+            type: 'rows',
+            monthColumn: monthField.name,
+            qtyColumn: qtyField?.name,
+            amountColumn: amountField?.name
+        };
+    }
+    return null;
+}
+async function loadMonthTotals(client, table) {
+    const sample = await client.query(`SELECT * FROM ${table} LIMIT 5`);
+    const fields = sample.fields;
+    const layout = detectMonthLayout(fields);
+    if (!layout)
+        return [];
+    if (layout.type === 'columns') {
+        const selectParts = [];
+        for (const m of layout.monthColumns) {
+            const qtyAlias = quoteIdent(`qty_${m.monthIndex}`);
+            const amtAlias = quoteIdent(`amt_${m.monthIndex}`);
+            selectParts.push(m.qtyColumn
+                ? `SUM(${quoteIdent(m.qtyColumn)})::numeric AS ${qtyAlias}`
+                : `0::numeric AS ${qtyAlias}`);
+            selectParts.push(m.amountColumn
+                ? `SUM(${quoteIdent(m.amountColumn)})::numeric AS ${amtAlias}`
+                : `0::numeric AS ${amtAlias}`);
+        }
+        const sql = `SELECT ${selectParts.join(', ')} FROM ${table}`;
+        const res = await client.query(sql);
+        const row = res.rows[0] ?? {};
+        return layout.monthColumns.map((m) => {
+            const qtyKey = `qty_${m.monthIndex}`;
+            const amtKey = `amt_${m.monthIndex}`;
+            const quantity = row[qtyKey] !== undefined ? Number(row[qtyKey]) : 0;
+            const amount = row[amtKey] !== undefined ? Number(row[amtKey]) : 0;
+            return {
+                monthIndex: m.monthIndex,
+                label: monthLabel(m.monthIndex),
+                quantity,
+                amount
+            };
+        });
+    }
+    const monthCol = quoteIdent(layout.monthColumn);
+    const qtyCol = layout.qtyColumn ? quoteIdent(layout.qtyColumn) : null;
+    const amtCol = layout.amountColumn ? quoteIdent(layout.amountColumn) : null;
+    const selectBits = [`${monthCol} AS month_value`];
+    if (qtyCol)
+        selectBits.push(`SUM(${qtyCol})::numeric AS qty`);
+    if (amtCol)
+        selectBits.push(`SUM(${amtCol})::numeric AS amt`);
+    const sql = `SELECT ${selectBits.join(', ')} FROM ${table} GROUP BY 1`;
+    const res = await client.query(sql);
+    return res.rows.map((r) => {
+        const idx = parseMonth(r.month_value);
+        const quantity = Number(r.qty ?? 0);
+        const amount = Number(r.amt ?? 0);
+        return {
+            monthIndex: idx,
+            label: idx ? monthLabel(idx) : String(r.month_value ?? ''),
+            quantity,
+            amount
+        };
+    });
+}
+function mergeMonthTotals(current, previous) {
+    const mapKey = (m) => m.monthIndex != null ? `idx-${m.monthIndex}` : `label-${m.label}`;
+    const keys = new Map();
+    [...current, ...previous].forEach((m) => {
+        const key = mapKey(m);
+        if (!keys.has(key))
+            keys.set(key, { monthIndex: m.monthIndex, label: m.label });
+    });
+    const ordered = Array.from(keys.values()).sort((a, b) => {
+        if (a.monthIndex && b.monthIndex)
+            return a.monthIndex - b.monthIndex;
+        if (a.monthIndex && !b.monthIndex)
+            return -1;
+        if (!a.monthIndex && b.monthIndex)
+            return 1;
+        return a.label.localeCompare(b.label);
+    });
+    const currentMap = new Map(current.map((m) => [mapKey(m), m]));
+    const previousMap = new Map(previous.map((m) => [mapKey(m), m]));
+    return ordered.map((m) => ({
+        monthLabel: m.label,
+        monthIndex: m.monthIndex,
+        currentQty: currentMap.get(mapKey(m))?.quantity ?? 0,
+        previousQty: previousMap.get(mapKey(m))?.quantity ?? 0,
+        currentAmount: currentMap.get(mapKey(m))?.amount ?? 0,
+        previousAmount: previousMap.get(mapKey(m))?.amount ?? 0
+    }));
+}
+function detectAmountField(fields) {
+    const match = fields.find((f) => isAmountLike(f.name));
+    return match ? match.name : null;
+}
+async function sumAmountColumn(client, table) {
+    const sample = await client.query(`SELECT * FROM ${table} LIMIT 1`);
+    const fields = sample.fields;
+    const amountField = detectAmountField(fields);
+    if (!amountField)
+        return null;
+    const sql = `SELECT SUM(${quoteIdent(amountField)})::numeric AS total FROM ${table}`;
+    const res = await client.query(sql);
+    return res.rows[0]?.total !== undefined ? Number(res.rows[0].total) : null;
+}
 // Raw rows preview from PostgreSQL table for Sale Order Analysis
 // GET /api/analytics/orders/raw?page=1&pageSize=50
 router.get('/orders/raw', async (req, res, next) => {
@@ -338,6 +540,121 @@ router.get('/orders/raw/status', async (req, res, next) => {
             const rows = result.rows.map((r) => ({ status: String(r.status ?? ''), count: Number(r.cnt ?? 0) }));
             const total = rows.reduce((acc, r) => acc + r.count, 0);
             res.json({ data: { total, rows } });
+        }
+        finally {
+            client.release();
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Product SKU raw preview for current / previous year tables
+router.get('/sku/raw', async (req, res, next) => {
+    try {
+        const querySchema = z
+            .object({
+            period: z.enum(['current', 'previous']).default('current'),
+            page: z
+                .string()
+                .optional()
+                .transform((v) => (v ? Number(v) : 1)),
+            pageSize: z
+                .string()
+                .optional()
+                .transform((v) => (v ? Number(v) : 50)),
+            q: z.string().optional()
+        })
+            .parse(req.query);
+        const page = Math.max(querySchema.page ?? 1, 1);
+        const maxPageSize = (() => {
+            const v = Number(process.env.RAW_MAX_PAGE_SIZE ?? '500');
+            return Number.isFinite(v) && v > 0 ? Math.floor(v) : 500;
+        })();
+        const pageSize = Math.min(Math.max(querySchema.pageSize ?? 50, 1), maxPageSize);
+        const offset = (page - 1) * pageSize;
+        const tableName = SKU_TABLES[querySchema.period];
+        const client = await getPool().connect();
+        try {
+            const sample = await client.query(`SELECT * FROM ${tableName} LIMIT 0`);
+            const fieldNames = sample.fields.map((f) => f.name);
+            const params = [];
+            const filters = [];
+            const rawQ = querySchema.q?.trim();
+            if (rawQ && rawQ.length > 0) {
+                const q = `%${rawQ}%`;
+                const preferred = ['sku', 'product', 'item', 'description', 'name', 'code', 'รหัส', 'สินค้า'];
+                const namesSet = new Set(fieldNames);
+                const chosen = [];
+                for (const p of preferred)
+                    if (namesSet.has(p))
+                        chosen.push(p);
+                for (const n of fieldNames) {
+                    if (chosen.length >= 8)
+                        break;
+                    if (!chosen.includes(n))
+                        chosen.push(n);
+                }
+                if (chosen.length > 0) {
+                    const orParts = [];
+                    for (const col of chosen.slice(0, 10)) {
+                        orParts.push(`CAST(${quoteIdent(col)} AS TEXT) ILIKE $${params.length + 1}`);
+                        params.push(q);
+                    }
+                    filters.push(`(${orParts.join(' OR ')})`);
+                }
+            }
+            const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+            const countSql = `SELECT COUNT(*)::bigint AS cnt FROM ${tableName} ${where}`;
+            const dataSql = `SELECT * FROM ${tableName} ${where} OFFSET $${params.length + 1} LIMIT $${params.length + 2}`;
+            const countResult = await client.query(countSql, params);
+            const totalRecords = Number(countResult.rows[0]?.cnt ?? 0);
+            const result = await client.query(dataSql, [...params, offset, pageSize]);
+            const columns = result.fields.map((f) => f.name);
+            res.json({
+                data: {
+                    columns,
+                    rows: result.rows,
+                    page,
+                    pageSize,
+                    totalRecords,
+                    totalPages: Math.max(Math.ceil(totalRecords / pageSize), 1)
+                }
+            });
+        }
+        finally {
+            client.release();
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Product SKU monthly totals comparison (current year vs previous year)
+router.get('/sku/monthly-comparison', async (_req, res, next) => {
+    try {
+        const client = await getPool().connect();
+        try {
+            const [currentTotals, previousTotals] = await Promise.all([
+                loadMonthTotals(client, SKU_TABLES.current),
+                loadMonthTotals(client, SKU_TABLES.previous)
+            ]);
+            const [currentAmountSum, previousAmountSum] = await Promise.all([
+                sumAmountColumn(client, SKU_TABLES.current),
+                sumAmountColumn(client, SKU_TABLES.previous)
+            ]);
+            const months = mergeMonthTotals(currentTotals, previousTotals);
+            res.json({
+                data: {
+                    months,
+                    currentYear: new Date().getFullYear(),
+                    previousYear: new Date().getFullYear() - 1,
+                    amountTotals: {
+                        currentAmount: currentAmountSum ?? currentTotals.reduce((a, b) => a + (b.amount ?? 0), 0),
+                        previousAmount: previousAmountSum ?? previousTotals.reduce((a, b) => a + (b.amount ?? 0), 0)
+                    }
+                }
+            });
         }
         finally {
             client.release();

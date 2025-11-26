@@ -6,6 +6,7 @@ import { ProtectedRoute } from './routes/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardHome } from './pages/DashboardHome';
 import { SalesOrderAnalysis } from './pages/SalesOrderAnalysis';
+import { ProductSkuDashboard } from './pages/ProductSkuDashboard';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { NocoDbMasterPage } from './pages/NocoDbMasterPage';
 import { UserManagementPanel } from './components/admin/UserManagementPanel';
@@ -20,6 +21,7 @@ function App() {
             <Route element={<ProtectedAppLayout />}>
               <Route path="/" element={<DashboardHome />} />
               <Route path="/dashboards/sales" element={<SalesOrderAnalysis />} />
+              <Route path="/dashboards/product-sku" element={<ProductSkuDashboard />} />
               <Route path="/integrations" element={<IntegrationsPage />} />
               <Route path="/nocodb" element={<NocoDbMasterPage />} />
             </Route>

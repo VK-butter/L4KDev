@@ -19,7 +19,7 @@ export function Sidebar({ user }: SidebarProps) {
       items: [
         { label: 'Sale order line', to: '/dashboards/sales' },
         { label: 'Inventory' },
-        { label: 'Product Sku' }
+        { label: 'Product Sku', to: '/dashboards/product-sku' }
       ]
     },
     {

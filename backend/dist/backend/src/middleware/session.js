@@ -1,6 +1,14 @@
 import session from 'express-session';
 const SESSION_SECRET = process.env.SESSION_SECRET ?? 'dev-session-secret';
 const isProd = process.env.NODE_ENV === 'production';
+const secureCookie = (() => {
+    const override = process.env.SESSION_COOKIE_SECURE?.toLowerCase();
+    if (override === 'true')
+        return true;
+    if (override === 'false')
+        return false;
+    return isProd;
+})();
 export const sessionMiddleware = session({
     name: 'sd.sid',
     secret: SESSION_SECRET,
@@ -10,7 +18,7 @@ export const sessionMiddleware = session({
     cookie: {
         httpOnly: true,
         sameSite: 'lax',
-        secure: isProd,
+        secure: secureCookie,
         maxAge: 1000 * 60 * 60 * 8
     }
 });

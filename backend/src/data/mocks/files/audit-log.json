@@ -1,5 +1,29 @@
 [
   {
+    "id": "f05a4677-1bfe-4853-afb6-f2fedc99a918",
+    "timestamp": "2025-11-26T02:14:41.379Z",
+    "actorId": "user-admin-001",
+    "action": "create",
+    "targetUserId": "c4931482-d30b-4344-b8d8-f3b84b6ad74e",
+    "details": "Created btbilionare@gmail.com"
+  },
+  {
+    "id": "4ce631ed-5d94-4205-a231-ff2f92f166f7",
+    "timestamp": "2025-11-25T16:29:12.089Z",
+    "actorId": "user-admin-001",
+    "action": "reactivate",
+    "targetUserId": "75defaca-6367-4ecc-be2b-98500cd7a1c8",
+    "details": "Reactivated user"
+  },
+  {
+    "id": "fb43d1c4-b65a-4fe3-8f10-8af27576c574",
+    "timestamp": "2025-11-25T16:29:09.289Z",
+    "actorId": "user-admin-001",
+    "action": "deactivate",
+    "targetUserId": "75defaca-6367-4ecc-be2b-98500cd7a1c8",
+    "details": "Deactivated user"
+  },
+  {
     "id": "190439c0-4c1f-4f69-9acc-d1d0db6400db",
     "timestamp": "2025-11-18T13:22:25.233Z",
     "actorId": "user-admin-001",

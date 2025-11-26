@@ -1,5 +1,13 @@
 [
   {
+    "id": "c4931482-d30b-4344-b8d8-f3b84b6ad74e",
+    "username": "btbilionare@gmail.com",
+    "displayName": "dev test",
+    "role": "analyst",
+    "status": "active",
+    "passwordHash": "plain:12345678"
+  },
+  {
     "id": "75defaca-6367-4ecc-be2b-98500cd7a1c8",
     "username": "autotest+1762836735211@example.com",
     "displayName": "QA User 1762836735211",

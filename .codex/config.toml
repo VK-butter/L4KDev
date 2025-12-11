@@ -1,1 +1,2 @@
-model = "gpt-5.1-codex"
+model = "gpt-5.1-codex-max"
+model_reasoning_effort = "medium"

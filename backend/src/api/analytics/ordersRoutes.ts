@@ -491,7 +491,8 @@ router.get('/orders/raw/summary', async (req, res, next) => {
         dateEnd: z
           .string()
           .optional()
-          .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd')
+          .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd'),
+        status: z.string().optional()
       })
       .parse(req.query);
 
@@ -502,6 +503,7 @@ router.get('/orders/raw/summary', async (req, res, next) => {
       );
       const fieldNames = (sample.fields as FieldDef[]).map((f) => f.name);
       const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\u0E00-\u0E7F]/g, '');
+      const normalizeStatus = normalize;
 
       const envDate = process.env.RAW_DATE_COLUMN;
       let chosenDate = envDate && envDate.trim().length > 0 ? envDate : '';
@@ -533,11 +535,31 @@ router.get('/orders/raw/summary', async (req, res, next) => {
         chosenQty = matchQty ?? '';
       }
 
-      const hasDateFilter = querySchema.dateStart && querySchema.dateEnd;
-      const where = hasDateFilter ? `WHERE (${dateColumn}::date BETWEEN $1 AND $2)` : '';
-      const params: Array<string | number> = hasDateFilter
-        ? [querySchema.dateStart as string, querySchema.dateEnd as string]
-        : [];
+      // Detect status column for optional status filtering
+      const envStatus = process.env.RAW_STATUS_COLUMN;
+      const statusCandidates = ['status', 'orderstatus', 'itemstatus', 'saled', 'sale_status', 'สถานะ'];
+      let chosenStatus = envStatus && envStatus.trim().length > 0 ? envStatus : '';
+      if (!chosenStatus) {
+        const match = fieldNames.find((n) => {
+          const key = normalizeStatus(n);
+          return statusCandidates.some((c) => key === c || key.includes(c));
+        });
+        chosenStatus = match ?? 'status';
+      }
+      const statusColumn = `"${chosenStatus.replace(/"/g, '""')}"`;
+
+      const filters: string[] = [];
+      const params: Array<string | number> = [];
+      if (querySchema.dateStart && querySchema.dateEnd) {
+        filters.push(`(${dateColumn}::date BETWEEN $${params.length + 1} AND $${params.length + 2})`);
+        params.push(querySchema.dateStart as string, querySchema.dateEnd as string);
+      }
+      if (querySchema.status) {
+        filters.push(`${statusColumn} = $${params.length + 1}`);
+        params.push(querySchema.status);
+      }
+
+      const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
 
       const selectParts = ['COUNT(*)::bigint AS cnt'];
       if (chosenRev) selectParts.push(`SUM("${chosenRev.replace(/"/g, '""')}")::numeric AS revenue`);

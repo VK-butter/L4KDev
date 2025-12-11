@@ -95,10 +95,11 @@ export const analyticsApi = {
 };
 
 export const analyticsSummaryApi = {
-  rawSummary: (params: { dateStart?: string; dateEnd?: string }) => {
+  rawSummary: (params: { dateStart?: string; dateEnd?: string; status?: string }) => {
     const sp = new URLSearchParams();
     if (params.dateStart) sp.set('dateStart', params.dateStart);
     if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
+    if (params.status) sp.set('status', params.status);
     return apiClient.get<{ data: { totalRecords: number; totalRevenue?: number; totalQuantity?: number } }>(
       `/analytics/orders/raw/summary?${sp.toString()}`
     );

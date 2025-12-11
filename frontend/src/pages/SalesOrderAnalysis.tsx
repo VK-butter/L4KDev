@@ -55,7 +55,8 @@ export function SalesOrderAnalysis() {
         const [sum, st, res] = await Promise.all([
           analyticsSummaryApi.rawSummary({
             dateStart: dateStart || undefined,
-            dateEnd: dateEnd || undefined
+            dateEnd: dateEnd || undefined,
+            status: statusFilter || undefined
           }),
           analyticsStatusApi.rawStatus({
             dateStart: dateStart || undefined,
@@ -164,7 +165,7 @@ export function SalesOrderAnalysis() {
     let totalRecords = summary?.totalRecords;
     if (!totalRecords || totalRecords < 0) {
       try {
-        const s = await analyticsSummaryApi.rawSummary({ dateStart: start, dateEnd: end });
+        const s = await analyticsSummaryApi.rawSummary({ dateStart: start, dateEnd: end, status: statusFilter || undefined });
         totalRecords = s.data.data.totalRecords;
       } catch {
         // fallback to at least current page

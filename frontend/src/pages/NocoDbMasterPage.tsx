@@ -7,15 +7,15 @@ export function NocoDbMasterPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+      <section className="panel">
         <header className="mb-4">
-          <p className="text-xs uppercase tracking-widest text-emerald-500">
+          <p className="section-heading">
             NOCODB MASTER
           </p>
-          <h1 className="text-2xl font-semibold text-emerald-900">
+          <h1 className="text-2xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">
             Embedded Tables
           </h1>
-          <p className="mt-2 text-sm text-emerald-600">
+          <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-200/90">
             View live tables from the Learning for Kidz workspace. Select any tab to load the latest data via the
             backend proxy (no additional login required).
           </p>

@@ -2,6 +2,7 @@ import type { Config } from 'tailwindcss';
 import { brandPalette } from './src/theme/tokens';
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './index.html',
     './src/**/*.{ts,tsx}',
@@ -15,8 +16,8 @@ const config: Config = {
         surface: brandPalette.surface
       },
       fontFamily: {
-        display: ['"Inter"', 'system-ui', 'sans-serif'],
-        body: ['"Inter"', 'system-ui', 'sans-serif']
+        display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+        body: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif']
       },
       boxShadow: {
         card: '0 10px 25px -15px rgba(16, 185, 129, 0.55)'

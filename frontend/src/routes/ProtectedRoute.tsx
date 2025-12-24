@@ -7,7 +7,7 @@ export function ProtectedRoute() {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-base text-emerald-900">
+      <div className="flex min-h-screen items-center justify-center bg-surface-base text-emerald-900 transition-colors duration-200 dark:bg-surface-baseDark dark:text-surface-textOnSurface">
         <p className="text-lg font-semibold">Checking your session…</p>
       </div>
     );

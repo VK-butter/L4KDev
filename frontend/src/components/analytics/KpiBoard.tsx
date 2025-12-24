@@ -29,12 +29,12 @@ export function KpiBoard({ summary, loading, error }: KpiBoardProps) {
         (label, index) => (
           <div
             key={label}
-            className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm"
+            className="panel"
           >
-            <p className="text-xs uppercase tracking-widest text-emerald-500">
+            <p className="section-heading">
               {label}
             </p>
-            <p className="mt-3 text-2xl font-semibold text-emerald-900">
+            <p className="mt-3 text-2xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">
               {loading || !summary
                 ? '—'
                 : formatValue(index, summary)}

@@ -43,14 +43,14 @@ export function Sidebar({ user }: SidebarProps) {
 
   return (
     <aside
-      className="hidden w-72 flex-shrink-0 flex-col gap-6 border-r border-emerald-100 bg-white px-6 py-6 lg:flex sticky top-16 self-start h-[calc(100vh-4rem)] overflow-y-auto"
+      className="hidden w-72 flex-shrink-0 flex-col gap-6 border-r border-emerald-100 bg-white px-6 py-6 lg:flex sticky top-16 self-start h-[calc(100vh-4rem)] overflow-y-auto transition-colors duration-200 dark:border-emerald-800 dark:bg-surface-cardDark"
       style={{ boxShadow: elevation.sidebar }}
       aria-label="Dashboard navigation"
       role="complementary"
     >
       {navGroups.map((group) => (
         <div key={group.title}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-300">
             {group.title}
           </p>
           <ul className="mt-3 space-y-1" role="list">
@@ -59,7 +59,7 @@ export function Sidebar({ user }: SidebarProps) {
                 {'to' in item ? (
                   <Link
                     to={item.to}
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:text-surface-textOnSurface dark:hover:bg-emerald-900/30"
                     aria-label={item.label}
                   >
                     {item.label}
@@ -69,7 +69,7 @@ export function Sidebar({ user }: SidebarProps) {
                     href={item.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                    className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:text-surface-textOnSurface dark:hover:bg-emerald-900/30"
                     aria-label={`${item.label} (opens new tab)`}
                   >
                     {item.label}
@@ -77,7 +77,7 @@ export function Sidebar({ user }: SidebarProps) {
                 ) : (
                   <button
                     type="button"
-                    className="w-full cursor-not-allowed rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-400"
+                    className="w-full cursor-not-allowed rounded-lg px-3 py-2 text-left text-sm font-medium text-emerald-400 dark:text-emerald-300/70"
                     aria-label={item.label}
                     disabled
                   >

@@ -175,11 +175,11 @@ export function DashboardHome() {
 
       <section
         id="embedding-playground"
-        className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm"
+        className="panel"
       >
         <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest text-emerald-500">
+            <label className="section-heading">
               Start Date
             </label>
             <input
@@ -187,11 +187,11 @@ export function DashboardHome() {
               value={dateStart}
               data-testid="filter-date-start"
               onChange={(event) => setDateRange(event.target.value, dateEnd)}
-              className="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+              className="input-elevated"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest text-emerald-500">
+            <label className="section-heading">
               End Date
             </label>
             <input
@@ -199,11 +199,11 @@ export function DashboardHome() {
               value={dateEnd}
               data-testid="filter-date-end"
               onChange={(event) => setDateRange(dateStart, event.target.value)}
-              className="w-full rounded-xl border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+              className="input-elevated"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest text-emerald-500">
+            <label className="section-heading">
               Categories
             </label>
             <div className="flex flex-wrap gap-2" data-testid="filter-categories">
@@ -213,27 +213,25 @@ export function DashboardHome() {
                   type="button"
                   onClick={() => toggleCategoryFilter(category)}
                   data-category={category}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                    filters.categories.includes(category)
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                      : 'border-emerald-100 text-emerald-500 hover:border-emerald-300'
+                  className={`chip ${
+                    filters.categories.includes(category) ? 'chip-active' : ''
                   }`}
                 >
                   {category}
                 </button>
               ))}
               {availableCategories.length === 0 && (
-                <p className="text-xs text-emerald-400">Loading categories…</p>
+                <p className="text-xs text-emerald-400 dark:text-emerald-200">Loading categories…</p>
               )}
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-widest text-emerald-500">
+            <label className="section-heading">
               Status ({statusFilterDescription})
             </label>
             <div className="flex items-center gap-3" data-testid="filter-statuses">
               {STATUS_OPTIONS.map((status) => (
-                <label key={status} className="flex items-center gap-1 text-xs text-emerald-700">
+                <label key={status} className="flex items-center gap-1 text-xs text-emerald-700 dark:text-surface-textOnSurface">
                   <input
                     type="checkbox"
                     checked={filters.statuses.includes(status)}

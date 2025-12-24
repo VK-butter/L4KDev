@@ -1,16 +1,16 @@
 export const brandPalette = {
   brand: {
-    50: '#ecfdf5',
-    100: '#d1fae5',
-    200: '#a7f3d0',
-    300: '#6ee7b7',
-    400: '#34d399',
-    500: '#10b981',
-    600: '#059669',
-    700: '#047857',
-    800: '#065f46',
-    900: '#064e3b',
-    950: '#022c22'
+    50: '#ecfdf3',
+    100: '#d6f7e5',
+    200: '#b1f1d3',
+    300: '#83e4b8',
+    400: '#4ed196',
+    500: '#22c172',
+    600: '#14a05b',
+    700: '#0f7f48',
+    800: '#0c653a',
+    900: '#0a5230',
+    950: '#052b1c'
   },
   accent: {
     100: '#cffafe',
@@ -19,9 +19,14 @@ export const brandPalette = {
     700: '#0e7490'
   },
   surface: {
-    base: '#f7fdf9',
-    muted: '#e6f4ed',
-    card: '#ffffff'
+    base: '#f7fbf8',
+    muted: '#e5f2eb',
+    card: '#ffffff',
+    baseDark: '#07130f',
+    mutedDark: '#0c1b15',
+    cardDark: '#0f2119',
+    textOnSurface: '#e2f3eb',
+    subtextOnSurface: '#9cd6b7'
   }
 };
 

@@ -50,7 +50,7 @@ function SkuRawTable({
   onExport
 }: SkuTableProps) {
   return (
-    <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+    <section className="panel">
       <header className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-widest text-emerald-500">{caption}</p>
@@ -311,7 +311,7 @@ export function ProductSkuDashboard() {
         </div>
       </header>
 
-      <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+      <section className="panel">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <p className="text-xs uppercase tracking-widest text-emerald-500">Monthly trend</p>
@@ -430,7 +430,7 @@ export function ProductSkuDashboard() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+      <section className="panel">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-widest text-emerald-500">Search</p>

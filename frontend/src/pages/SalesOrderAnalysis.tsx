@@ -216,37 +216,38 @@ export function SalesOrderAnalysis() {
 
       {/* Price Summary + Target (mock) – brighter UI, stays above */}
       <section className="grid gap-4 sm:grid-cols-1">
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 shadow-sm">
-          <p className="text-xs uppercase tracking-widest text-emerald-600">รวมราคา (Price) Summary</p>
+        <div className="panel relative overflow-hidden text-emerald-900 dark:text-surface-textOnSurface">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-100/50 via-transparent to-teal-100/30 dark:from-emerald-900/30 dark:via-transparent dark:to-emerald-800/30" />
+          <p className="section-heading relative">รวมราคา (Price) Summary</p>
           {(() => {
             const priceTarget = 1_000_000; // mock
             const achieved = summary?.totalRevenue ?? 0;
             const pct = Math.max(0, Math.min(100, Math.round((achieved / priceTarget) * 100)));
             const delta = priceTarget - achieved;
             return (
-              <>
+              <div className="relative">
                 <div className="mt-2 flex items-end justify-between">
                   <div>
-                    <p className="text-emerald-700 text-sm">Achieved (฿)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900">
+                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Achieved (฿)</p>
+                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">
                       ฿ {achieved.toLocaleString()}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-emerald-700 text-sm">Target (฿)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900">฿ {priceTarget.toLocaleString()}</p>
+                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Target (฿)</p>
+                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">฿ {priceTarget.toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-emerald-100" aria-label="Progress to price target">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/50" aria-label="Progress to price target">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all dark:bg-emerald-400" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-emerald-700">{pct}%</span>
-                  <span className={delta > 0 ? 'text-red-600' : 'text-emerald-700'}>
+                  <span className="text-emerald-700 dark:text-emerald-200/90">{pct}%</span>
+                  <span className={delta > 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-200/90'}>
                     {delta > 0 ? `Remaining: ฿ ${delta.toLocaleString()}` : `Exceeded by ฿ ${Math.abs(delta).toLocaleString()}`}
                   </span>
                 </div>
-              </>
+              </div>
             );
           })()}
         </div>
@@ -254,8 +255,9 @@ export function SalesOrderAnalysis() {
 
       {/* Quantity Summary + Target (mock) – second */}
       <section className="grid gap-4 sm:grid-cols-1">
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 shadow-sm">
-          <p className="text-xs uppercase tracking-widest text-emerald-600">Quantity Summary</p>
+        <div className="panel relative overflow-hidden text-emerald-900 dark:text-surface-textOnSurface">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-100/60 via-transparent to-emerald-50/30 dark:from-emerald-900/30 dark:via-transparent dark:to-emerald-800/30" />
+          <p className="section-heading relative">Quantity Summary</p>
           {(() => {
             const qtyTarget = 80_000; // mock target quantity
             const q = summary?.totalQuantity;
@@ -263,29 +265,29 @@ export function SalesOrderAnalysis() {
             const pct = Math.max(0, Math.min(100, Math.round(((achievedQty || 0) / qtyTarget) * 100)));
             const delta = qtyTarget - (achievedQty || 0);
             return (
-              <>
+              <div className="relative">
                 <div className="mt-2 flex items-end justify-between">
                   <div>
-                    <p className="text-emerald-700 text-sm">Achieved (qty)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900">
+                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Achieved (qty)</p>
+                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">
                       {typeof q === 'number' ? achievedQty.toLocaleString() : '—'}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-emerald-700 text-sm">Target (qty)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900">{qtyTarget.toLocaleString()}</p>
+                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Target (qty)</p>
+                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">{qtyTarget.toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-emerald-100" aria-label="Progress to qty target">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/50" aria-label="Progress to qty target">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all dark:bg-emerald-400" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-emerald-700">{pct}%</span>
-                  <span className={delta > 0 ? 'text-red-600' : 'text-emerald-700'}>
+                  <span className="text-emerald-700 dark:text-emerald-200/90">{pct}%</span>
+                  <span className={delta > 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-200/90'}>
                     {delta > 0 ? `Remaining: ${delta.toLocaleString()}` : `Exceeded by ${Math.abs(delta).toLocaleString()}`}
                   </span>
                 </div>
-              </>
+              </div>
             );
           })()}
         </div>
@@ -293,15 +295,15 @@ export function SalesOrderAnalysis() {
 
       {/* Status pie (Complete vs Cancel) with click-to-filter – third */}
       <section className="grid gap-4 sm:grid-cols-1">
-        <div className="rounded-2xl border border-emerald-200 bg-white p-5 text-emerald-900 shadow-sm relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/30 to-teal-100/20 pointer-events-none" />
+        <div className="panel relative overflow-hidden text-emerald-900 dark:text-surface-textOnSurface">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/30 to-teal-100/20 pointer-events-none dark:from-emerald-900/20 dark:to-emerald-800/20" />
           <div className="relative">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-widest text-emerald-600">Status Breakdown</p>
+              <p className="section-heading">Status Breakdown</p>
               {statusFilter && (
                 <button
                   type="button"
-                  className="text-xs font-semibold uppercase tracking-widest text-emerald-500"
+                  className="text-xs font-semibold uppercase tracking-widest text-emerald-500 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
                   onClick={() => setStatusFilter(undefined)}
                 >
                   Clear filter
@@ -439,53 +441,53 @@ export function SalesOrderAnalysis() {
 
       
       {/* Filters – fourth */}
-      <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+      <section className="panel">
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs uppercase tracking-widest text-emerald-500">Filters</p>
-            <h3 className="text-lg font-semibold text-emerald-900">Date Range</h3>
+            <p className="section-heading">Filters</p>
+            <h3 className="text-lg font-semibold text-emerald-900 dark:text-surface-textOnSurface">Date Range</h3>
           </div>
           <div className="flex items-end gap-3">
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-emerald-700">Start Date</label>
+              <label className="block text-xs font-medium text-emerald-700 dark:text-emerald-200/90">Start Date</label>
               <input
                 type="date"
                 value={dateStart}
                 onChange={(e) => { setDateStart(e.target.value); setPage(1); }}
                 lang="en-GB"
-                className="rounded-lg border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                className="input-elevated"
               />
             </div>
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-emerald-700">End Date</label>
+              <label className="block text-xs font-medium text-emerald-700 dark:text-emerald-200/90">End Date</label>
               <input
                 type="date"
                 value={dateEnd}
                 onChange={(e) => { setDateEnd(e.target.value); setPage(1); }}
                 lang="en-GB"
-                className="rounded-lg border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                className="input-elevated"
               />
             </div>
             <div className="flex items-center gap-2 pb-1">
-              <button type="button" onClick={setDaily} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 hover:border-emerald-400">Daily</button>
-              <button type="button" onClick={setYTD} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 hover:border-emerald-400">YTD</button>
-              <button type="button" onClick={clearDates} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 hover:border-emerald-400">All</button>
+              <button type="button" onClick={setDaily} className="chip">Daily</button>
+              <button type="button" onClick={setYTD} className="chip">YTD</button>
+              <button type="button" onClick={clearDates} className="chip">All</button>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+      <section className="panel">
         <header className="mb-3 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-widest text-emerald-500">Table</p>
-            <h3 className="text-lg font-semibold text-emerald-900">Raw Orders</h3>
+            <p className="section-heading">Table</p>
+            <h3 className="text-lg font-semibold text-emerald-900 dark:text-surface-textOnSurface">Raw Orders</h3>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={exportAllToExcel}
-              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:border-emerald-400"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-surface-textOnSurface"
               title="Export all filtered rows to Excel"
             >
               {/* Simple Excel-like icon (SVG) */}
@@ -502,14 +504,14 @@ export function SalesOrderAnalysis() {
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Search rows..."
-                className="w-56 rounded-lg border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                className="w-56 input-elevated"
               />
             </div>
           </div>
         </header>
 
-        {loading && <p className="text-emerald-500">Loading…</p>}
-        {error && <p className="text-rose-600">{error}</p>}
+        {loading && <p className="text-emerald-500 dark:text-emerald-200">Loading…</p>}
+        {error && <p className="text-rose-600 dark:text-rose-300">{error}</p>}
         {!loading && !error && data && (
           <div className="overflow-auto max-h-96 rounded border border-emerald-100">
             <table className="min-w-full border-collapse text-sm">

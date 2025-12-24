@@ -1,4 +1,5 @@
 import { brandPalette, elevation } from '../../theme/tokens';
+import { useTheme } from '../../theme/useTheme';
 import type { SessionUser } from '../../hooks/useSession';
 import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
@@ -19,10 +20,11 @@ interface TopNavProps {
 export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavProps) {
   const location = useLocation();
   const [logoError, setLogoError] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const logoUrl = import.meta.env.VITE_BRAND_LOGO_URL ?? '/brand/logo.png';
   return (
     <header
-      className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-100 bg-white/90 px-8 py-4 backdrop-blur"
+      className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-100/70 bg-white/90 px-8 py-4 backdrop-blur transition-colors duration-200 dark:border-white/10 dark:bg-surface-cardDark/80"
       style={{ boxShadow: elevation.nav }}
       role="banner"
       aria-label="Application header"
@@ -31,7 +33,7 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="mr-1 inline-flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-lg border border-emerald-100 bg-white text-emerald-700 shadow-sm hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+          className="mr-1 inline-flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-lg border border-emerald-100 bg-white text-emerald-700 shadow-sm transition-colors duration-200 hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-800 dark:bg-surface-cardDark dark:text-surface-textOnSurface"
           aria-label="Toggle sidebar"
         >
           {/* simple hamburger icon */}
@@ -74,7 +76,9 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
               key={link.label}
               to={link.href}
               className={`transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 focus-visible:rounded ${
-                active ? 'text-emerald-600' : 'hover:text-emerald-500'
+                active
+                  ? 'text-emerald-600 dark:text-emerald-300'
+                  : 'hover:text-emerald-500 dark:text-surface-textOnSurface dark:hover:text-emerald-200'
               }`}
             >
               {link.label}
@@ -83,10 +87,19 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
         })}
       </nav>
 
-      <div className="flex items-center gap-4">
-        <div className="hidden text-right text-sm font-medium text-emerald-900 md:block">
+      <div className="flex items-center gap-3 md:gap-4">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-pressed={theme === 'dark'}
+          className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-widest text-emerald-700 shadow-sm transition-colors duration-200 hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-800 dark:bg-surface-cardDark dark:text-surface-textOnSurface dark:hover:border-emerald-500"
+        >
+          <span aria-hidden>{theme === 'dark' ? '☀️' : '🌙'}</span>
+          <span className="hidden md:inline">{theme === 'dark' ? 'Light' : 'Dark'} mode</span>
+        </button>
+        <div className="hidden text-right text-sm font-medium text-emerald-900 dark:text-surface-textOnSurface md:block">
           <p>{user?.displayName ?? 'Guest'}</p>
-          <p className="text-emerald-500 text-xs uppercase tracking-widest">
+          <p className="text-emerald-500 text-xs uppercase tracking-widest dark:text-emerald-300">
             {user?.role ?? 'role'}
           </p>
         </div>
@@ -95,7 +108,7 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
             type="button"
             onClick={onAdminMenu}
             data-testid="admin-menu-button"
-            className="rounded-full border border-emerald-100 bg-white px-4 py-1 text-sm font-medium text-emerald-700 shadow-sm transition hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            className="rounded-full border border-emerald-100 bg-white px-4 py-1 text-sm font-medium text-emerald-700 shadow-sm transition hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-800 dark:bg-surface-cardDark dark:text-surface-textOnSurface dark:hover:border-emerald-500"
             aria-label="Open admin menu"
           >
             Admin Menu
@@ -104,7 +117,7 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
         <button
           type="button"
           onClick={onLogout}
-          className="rounded-lg border border-emerald-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-emerald-700 transition hover:border-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+          className="rounded-lg border border-emerald-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-emerald-700 transition hover:border-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-700 dark:text-surface-textOnSurface dark:hover:border-emerald-500"
           aria-label="Sign out"
         >
           Logout

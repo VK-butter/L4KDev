@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import {
   analyticsApi,
   analyticsSummaryApi,
   analyticsStatusApi,
-  type RawOrdersPage
+  analyticsSalesTargetApi,
+  type RawOrdersPage,
+  type SalesTargetCompareResponse
 } from '../services/analyticsApi';
 
 type ApiErrorResponse = {
@@ -21,9 +23,62 @@ type PieClickPayload = {
 
 function toIso(d: Date) { return d.toISOString().slice(0, 10); }
 
+function fmtRev(value: number) {
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/* ── Animated number counter ────────────────────── */
+function AnimatedNum({ value, prefix = '', suffix = '' }: { value: number; prefix?: string; suffix?: string }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    const dur = 600;
+    const start = performance.now();
+    const from = display;
+    function tick(now: number) {
+      const t = Math.min((now - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (value - from) * ease));
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }, [value]);
+  return <>{prefix}{display.toLocaleString()}{suffix}</>;
+}
+
+/* ── SVG Icons ──────────────────────────────────── */
+const RevenueIcon = <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+const QtyIcon = <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>;
+const OrdersIcon = <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>;
+const TargetIcon = <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>;
+
+/* ── KPI metric mini-card ───────────────────────── */
+function MetricBox({ label, value, displayValue, icon, color, hint }: {
+  label: string; value?: number; displayValue?: string; icon: React.ReactNode; color: string; hint?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-200 hover:scale-[1.02]
+      border-emerald-100 bg-white dark:border-white/[0.06] dark:bg-white/[0.03]">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-emerald-500">{label}</p>
+        <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+          {displayValue != null ? displayValue : (value != null ? <AnimatedNum value={value} /> : '—')}
+        </p>
+        {hint && (
+          <p className="mt-0.5 text-[10px] text-gray-500 dark:text-emerald-500">{hint}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SalesOrderAnalysis() {
-  const [dateStart, setDateStart] = useState<string>(''); // yyyy-mm-dd
-  const [dateEnd, setDateEnd] = useState<string>(''); // yyyy-mm-dd
+  const [dateStart, setDateStart] = useState<string>('');
+  const [dateEnd, setDateEnd] = useState<string>('');
   const [data, setData] = useState<RawOrdersPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +89,11 @@ export function SalesOrderAnalysis() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  const [targetData, setTargetData] = useState<SalesTargetCompareResponse | null>(null);
+  const fallbackTargetStart = toIso(new Date(new Date().getFullYear(), 0, 1));
+  const fallbackTargetEnd = toIso(new Date());
+  const effectiveTargetStart = dateStart || fallbackTargetStart;
+  const effectiveTargetEnd = dateEnd || fallbackTargetEnd;
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -52,7 +112,7 @@ export function SalesOrderAnalysis() {
       setLoading(true);
       setError(null);
       try {
-        const [sum, st, res] = await Promise.all([
+        const [sum, st, res, tgt] = await Promise.all([
           analyticsSummaryApi.rawSummary({
             dateStart: dateStart || undefined,
             dateEnd: dateEnd || undefined,
@@ -69,9 +129,17 @@ export function SalesOrderAnalysis() {
             dateEnd: dateEnd || undefined,
             status: statusFilter || undefined,
             q: debouncedSearch || undefined
-          })
+          }),
+          analyticsSalesTargetApi.compareSalesTarget({
+            dateStart: effectiveTargetStart,
+            dateEnd: effectiveTargetEnd,
+            statuses: statusFilter ? [statusFilter] : [],
+            channels: [],
+            categories: []
+          }).catch(() => null)
         ]);
         if (!ignore) setSummary(sum.data.data);
+        if (!ignore && tgt) setTargetData(tgt.data.data);
         if (!ignore) {
           const rows = st.data.data.rows || [];
           const total = st.data.data.total || 0;
@@ -132,8 +200,6 @@ export function SalesOrderAnalysis() {
     setPage(1);
   }
 
-  // Server-side search via `q`; no client-side row filtering here.
-
   function downloadBlob(content: BlobPart, fileName: string, contentType: string) {
     const blob = new Blob([content], { type: contentType });
     const url = URL.createObjectURL(blob);
@@ -146,7 +212,7 @@ export function SalesOrderAnalysis() {
     URL.revokeObjectURL(url);
   }
 
-  function mapCellDisplay(column: string, value: unknown): string {
+  function mapCellDisplay(_column: string, value: unknown): string {
     const s = String(value ?? '');
     const n = s.trim().toLowerCase();
     if (n === 'saled') return 'Complete';
@@ -154,13 +220,10 @@ export function SalesOrderAnalysis() {
   }
 
   async function exportAllToExcel() {
-    // Export all filtered rows (not just current page)
-    // Use max pageSize 500 for fewer requests
     const pageSize = 500;
     const start = dateStart || undefined;
     const end = dateEnd || undefined;
 
-    // Ensure we have columns and total count
     let columns = data?.columns ?? [];
     let totalRecords = summary?.totalRecords;
     if (!totalRecords || totalRecords < 0) {
@@ -168,13 +231,11 @@ export function SalesOrderAnalysis() {
         const s = await analyticsSummaryApi.rawSummary({ dateStart: start, dateEnd: end, status: statusFilter || undefined });
         totalRecords = s.data.data.totalRecords;
       } catch {
-        // fallback to at least current page
         totalRecords = data?.totalRecords ?? 0;
       }
     }
 
     if (!columns.length) {
-      // fetch a small page to get columns
       const one = await analyticsApi.rawOrders({ page: 1, pageSize: 1, dateStart: start, dateEnd: end, status: statusFilter || undefined, q: debouncedSearch || undefined });
       columns = one.data.data.columns;
     }
@@ -205,334 +266,281 @@ export function SalesOrderAnalysis() {
     downloadBlob(csv, file, 'text/csv;charset=utf-8;');
   }
 
+  const priceTarget = targetData?.kpi.targetRevenue ?? 0;
+  const achieved = targetData?.kpi.actualRevenue ?? summary?.totalRevenue ?? 0;
+  const pricePct = priceTarget > 0 ? Math.max(0, Math.min(100, Math.round((achieved / priceTarget) * 100))) : 0;
+  const priceDelta = priceTarget - achieved;
+  const achievementPct = targetData?.kpi.achievementPct;
+
+  const achievedQty = typeof summary?.totalQuantity === 'number' ? summary.totalQuantity : 0;
+
+  const statusTotal = Math.max(statusBreakdown.total, statusBreakdown.saled + statusBreakdown.cancel);
+
   return (
-    <div className="flex flex-col gap-6" data-testid="sales-order-analysis">
-      <header className="flex items-end justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-emerald-500">Dashboards</p>
-          <h1 className="text-2xl font-semibold text-emerald-900">Sale order lines</h1>
-        </div>
+    <div className="flex flex-col gap-5" data-testid="sales-order-analysis">
+      {/* ── Header ──────────────────────────────── */}
+      <header>
+        <p className="section-heading">Dashboards</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">ภาพรวมยอดขาย</h1>
+        <p className="text-sm text-gray-500 dark:text-emerald-400">
+          สรุปยอดขาย สถานะ และตัวกรองช่วงเวลา
+        </p>
       </header>
 
-      {/* Price Summary + Target (mock) – brighter UI, stays above */}
-      <section className="grid gap-4 sm:grid-cols-1">
-        <div className="panel relative overflow-hidden text-emerald-900 dark:text-surface-textOnSurface">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-100/50 via-transparent to-teal-100/30 dark:from-emerald-900/30 dark:via-transparent dark:to-emerald-800/30" />
-          <p className="section-heading relative">รวมราคา (Price) Summary</p>
-          {(() => {
-            const priceTarget = 1_000_000; // mock
-            const achieved = summary?.totalRevenue ?? 0;
-            const pct = Math.max(0, Math.min(100, Math.round((achieved / priceTarget) * 100)));
-            const delta = priceTarget - achieved;
-            return (
-              <div className="relative">
-                <div className="mt-2 flex items-end justify-between">
-                  <div>
-                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Achieved (฿)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">
-                      ฿ {achieved.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Target (฿)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">฿ {priceTarget.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/50" aria-label="Progress to price target">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all dark:bg-emerald-400" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-emerald-700 dark:text-emerald-200/90">{pct}%</span>
-                  <span className={delta > 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-200/90'}>
-                    {delta > 0 ? `Remaining: ฿ ${delta.toLocaleString()}` : `Exceeded by ฿ ${Math.abs(delta).toLocaleString()}`}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+      {/* ── KPI Cards ────────────────────────────── */}
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricBox label="ยอดขายจริง" displayValue={`฿${fmtRev(achieved)}`} icon={RevenueIcon}
+          color="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300" />
+        <MetricBox
+          label="เป้ายอดขาย"
+          displayValue={priceTarget > 0 ? `฿${fmtRev(priceTarget)}` : '—'}
+          icon={TargetIcon}
+          hint={`Target range: ${effectiveTargetStart} to ${effectiveTargetEnd}`}
+          color="bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300"
+        />
+        <MetricBox label="จำนวน (Qty)" value={achievedQty} icon={QtyIcon}
+          color="bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-300" />
+        <MetricBox label="% Achievement" displayValue={achievementPct != null ? `${achievementPct.toFixed(1)}%` : '—'} icon={OrdersIcon}
+          color={achievementPct != null && achievementPct >= 100
+            ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300'
+            : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-300'} />
       </section>
 
-      {/* Quantity Summary + Target (mock) – second */}
-      <section className="grid gap-4 sm:grid-cols-1">
-        <div className="panel relative overflow-hidden text-emerald-900 dark:text-surface-textOnSurface">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-100/60 via-transparent to-emerald-50/30 dark:from-emerald-900/30 dark:via-transparent dark:to-emerald-800/30" />
-          <p className="section-heading relative">Quantity Summary</p>
-          {(() => {
-            const qtyTarget = 80_000; // mock target quantity
-            const q = summary?.totalQuantity;
-            const achievedQty = typeof q === 'number' ? q : 0;
-            const pct = Math.max(0, Math.min(100, Math.round(((achievedQty || 0) / qtyTarget) * 100)));
-            const delta = qtyTarget - (achievedQty || 0);
-            return (
-              <div className="relative">
-                <div className="mt-2 flex items-end justify-between">
-                  <div>
-                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Achieved (qty)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">
-                      {typeof q === 'number' ? achievedQty.toLocaleString() : '—'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-emerald-700 text-sm dark:text-emerald-200/90">Target (qty)</p>
-                    <p className="mt-1 text-3xl font-semibold text-emerald-900 dark:text-surface-textOnSurface">{qtyTarget.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/50" aria-label="Progress to qty target">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all dark:bg-emerald-400" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-emerald-700 dark:text-emerald-200/90">{pct}%</span>
-                  <span className={delta > 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-200/90'}>
-                    {delta > 0 ? `Remaining: ${delta.toLocaleString()}` : `Exceeded by ${Math.abs(delta).toLocaleString()}`}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      </section>
-
-      {/* Status pie (Complete vs Cancel) with click-to-filter – third */}
-      <section className="grid gap-4 sm:grid-cols-1">
-        <div className="panel relative overflow-hidden text-emerald-900 dark:text-surface-textOnSurface">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/30 to-teal-100/20 pointer-events-none dark:from-emerald-900/20 dark:to-emerald-800/20" />
-          <div className="relative">
-            <div className="flex items-center justify-between">
-              <p className="section-heading">Status Breakdown</p>
-              {statusFilter && (
-                <button
-                  type="button"
-                  className="text-xs font-semibold uppercase tracking-widest text-emerald-500 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
-                  onClick={() => setStatusFilter(undefined)}
-                >
-                  Clear filter
-                </button>
-              )}
-            </div>
-
-            {/* Two-column layout: Pie left, Info right */}
-            <div className="mt-2 grid gap-4 md:grid-cols-2 items-center">
-              {/* Left: Donut Pie */}
-              <div className="mx-auto w-full flex justify-center">
-                {(() => {
-                  const chartData = [
-                    { name: 'Complete', value: statusBreakdown.saled, color: '#2563eb', grad: 'blue' },
-                    { name: 'Cancel', value: statusBreakdown.cancel, color: '#dc2626', grad: 'red' }
-                  ];
-                  const total = Math.max(
-                    statusBreakdown.total,
-                    statusBreakdown.saled + statusBreakdown.cancel
-                  );
-                  return (
-                    <div className="relative" data-testid="status-pie">
-                      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-blue-300/20 to-rose-300/20 blur-3xl rounded-full" />
-                      <ResponsiveContainer width={240} height={220}>
-                        <PieChart>
-                          <defs>
-                            <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#60a5fa" />
-                              <stop offset="100%" stopColor="#2563eb" />
-                            </linearGradient>
-                            <linearGradient id="redGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#f87171" />
-                              <stop offset="100%" stopColor="#dc2626" />
-                            </linearGradient>
-                            <filter id="pieShadow">
-                              <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.25" />
-                            </filter>
-                          </defs>
-                          <Pie
-                            data={chartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={55}
-                            outerRadius={95}
-                            paddingAngle={4}
-                            dataKey="value"
-                            onClick={(entry: PieClickPayload) => {
-                              const label = entry?.name as string;
-                              if (!label) return;
-                              handleStatusSelect(label);
-                            }}
-                            style={{ cursor: 'pointer', filter: 'url(#pieShadow)' }}
-                          >
-                            {chartData.map((entry) => (
-                              <Cell
-                                key={entry.name}
-                                fill={entry.grad === 'blue' ? 'url(#blueGradient)' : 'url(#redGradient)'}
-                                opacity={statusFilter == null || entry.name === statusFilter ? 1 : 0.35}
-                                stroke={entry.name === statusFilter ? '#fff' : 'none'}
-                                strokeWidth={entry.name === statusFilter ? 4 : 0}
-                                onClick={() => handleStatusSelect(entry.name)}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            formatter={(value: number, name: string) => [
-                              value.toLocaleString(),
-                              name
-                            ]}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      {/* Center total */}
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <p className="text-slate-500 text-xs">Total</p>
-                          <p className="text-xl font-semibold text-slate-800">{total.toLocaleString()}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Right: Info Cards */}
-              <div className="grid gap-3">
-                {(() => {
-                  const total = Math.max(
-                    statusBreakdown.total,
-                    statusBreakdown.saled + statusBreakdown.cancel
-                  );
-                  const items = [
-                    {
-                      label: 'Complete',
-                      key: 'Complete',
-                      color: '#2563eb',
-                      value: statusBreakdown.saled,
-                      pct: total > 0 ? Math.round((statusBreakdown.saled / total) * 1000) / 10 : 0
-                    },
-                    {
-                      label: 'Cancel',
-                      key: 'Cancel',
-                      color: '#dc2626',
-                      value: statusBreakdown.cancel,
-                      pct: total > 0 ? Math.round((statusBreakdown.cancel / total) * 1000) / 10 : 0
-                    }
-                  ];
-                  return items.map((it) => (
-                    <button
-                      key={it.key}
-                      type="button"
-                      onClick={() => handleStatusSelect(it.label)}
-                      className={`text-left rounded-xl border p-3 shadow-sm transition-colors ${
-                        statusFilter === it.label
-                          ? 'border-emerald-400 bg-emerald-50'
-                          : 'border-emerald-100 bg-white hover:bg-emerald-50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: it.color }} />
-                          <span className="font-semibold text-emerald-900">{it.label}:</span>
-                        </div>
-                        <span className="text-emerald-800">{it.value.toLocaleString()}</span>
-                      </div>
-                      <div className="mt-1 text-sm text-emerald-700">{it.pct}% of total</div>
-                    </button>
-                  ));
-                })()}
-              </div>
-            </div>
+      {/* ── Revenue vs Target Progress ───────────── */}
+      {priceTarget > 0 && (
+        <section className="panel">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">ยอดขายจริง vs เป้ายอดขาย</p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-emerald-500">
+            Target range: {effectiveTargetStart} to {effectiveTargetEnd} (monthly target)
+          </p>
+          <div className="mt-3 flex items-end justify-between">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">฿{achieved.toLocaleString()}</p>
+            <p className="text-sm text-gray-400 dark:text-emerald-500">/ ฿{priceTarget.toLocaleString()}</p>
           </div>
-        </div>
-      </section>
+          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/50">
+            <div className={`h-full rounded-full transition-all ${priceDelta > 0 ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-emerald-500 dark:bg-emerald-400'}`}
+              style={{ width: `${Math.min(pricePct, 100)}%` }} />
+          </div>
+          <div className="mt-1.5 flex items-center justify-between text-xs">
+            <span className="font-semibold text-gray-600 dark:text-emerald-300">{pricePct}%</span>
+            <span className={priceDelta > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-300'}>
+              {priceDelta > 0 ? `ขาดอีก: ฿${priceDelta.toLocaleString()}` : `เกินเป้า: ฿${Math.abs(priceDelta).toLocaleString()}`}
+            </span>
+          </div>
+        </section>
+      )}
 
-      
-      {/* Filters – fourth */}
+      {/* ── Status Breakdown ─────────────────────── */}
       <section className="panel">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="section-heading">Filters</p>
-            <h3 className="text-lg font-semibold text-emerald-900 dark:text-surface-textOnSurface">Date Range</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Status Breakdown</h3>
+          {statusFilter && (
+            <button
+              type="button"
+              className="text-xs font-semibold uppercase tracking-widest text-emerald-500 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
+              onClick={() => setStatusFilter(undefined)}
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 items-center">
+          {/* Donut Pie */}
+          <div className="mx-auto w-full flex justify-center">
+            {(() => {
+              const chartData = [
+                { name: 'Complete', value: statusBreakdown.saled, color: '#2563eb', grad: 'blue' },
+                { name: 'Cancel', value: statusBreakdown.cancel, color: '#dc2626', grad: 'red' }
+              ];
+              return (
+                <div className="relative" data-testid="status-pie">
+                  <ResponsiveContainer width={240} height={220}>
+                    <PieChart>
+                      <defs>
+                        <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#60a5fa" />
+                          <stop offset="100%" stopColor="#2563eb" />
+                        </linearGradient>
+                        <linearGradient id="redGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f87171" />
+                          <stop offset="100%" stopColor="#dc2626" />
+                        </linearGradient>
+                        <filter id="pieShadow">
+                          <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.25" />
+                        </filter>
+                      </defs>
+                      <Pie
+                        data={chartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={95}
+                        paddingAngle={4}
+                        dataKey="value"
+                        onClick={(entry: PieClickPayload) => {
+                          const label = entry?.name as string;
+                          if (!label) return;
+                          handleStatusSelect(label);
+                        }}
+                        style={{ cursor: 'pointer', filter: 'url(#pieShadow)' }}
+                      >
+                        {chartData.map((entry) => (
+                          <Cell
+                            key={entry.name}
+                            fill={entry.grad === 'blue' ? 'url(#blueGradient)' : 'url(#redGradient)'}
+                            opacity={statusFilter == null || entry.name === statusFilter ? 1 : 0.35}
+                            stroke={entry.name === statusFilter ? '#fff' : 'none'}
+                            strokeWidth={entry.name === statusFilter ? 4 : 0}
+                            onClick={() => handleStatusSelect(entry.name)}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number, name: string) => [
+                          value.toLocaleString(),
+                          name
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 dark:text-emerald-500">Total</p>
+                      <p className="text-xl font-bold text-gray-900 dark:text-white">{statusTotal.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
-          <div className="flex items-end gap-3">
-            <div className="space-y-1">
-              <label className="block text-xs font-medium text-emerald-700 dark:text-emerald-200/90">Start Date</label>
-              <input
-                type="date"
-                value={dateStart}
-                onChange={(e) => { setDateStart(e.target.value); setPage(1); }}
-                lang="en-GB"
-                className="input-elevated"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-xs font-medium text-emerald-700 dark:text-emerald-200/90">End Date</label>
-              <input
-                type="date"
-                value={dateEnd}
-                onChange={(e) => { setDateEnd(e.target.value); setPage(1); }}
-                lang="en-GB"
-                className="input-elevated"
-              />
-            </div>
-            <div className="flex items-center gap-2 pb-1">
-              <button type="button" onClick={setDaily} className="chip">Daily</button>
-              <button type="button" onClick={setYTD} className="chip">YTD</button>
-              <button type="button" onClick={clearDates} className="chip">All</button>
-            </div>
+
+          {/* Info Cards */}
+          <div className="grid gap-3">
+            {[
+              {
+                label: 'Complete',
+                key: 'Complete',
+                color: '#2563eb',
+                value: statusBreakdown.saled,
+                pct: statusTotal > 0 ? Math.round((statusBreakdown.saled / statusTotal) * 1000) / 10 : 0
+              },
+              {
+                label: 'Cancel',
+                key: 'Cancel',
+                color: '#dc2626',
+                value: statusBreakdown.cancel,
+                pct: statusTotal > 0 ? Math.round((statusBreakdown.cancel / statusTotal) * 1000) / 10 : 0
+              }
+            ].map((it) => (
+              <button
+                key={it.key}
+                type="button"
+                onClick={() => handleStatusSelect(it.label)}
+                className={`text-left rounded-xl border p-3 transition-all duration-150 ${
+                  statusFilter === it.label
+                    ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-900/40'
+                    : 'border-emerald-100 bg-white hover:bg-emerald-50 dark:border-white/[0.06] dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: it.color }} />
+                    <span className="font-semibold text-gray-900 dark:text-white">{it.label}</span>
+                  </div>
+                  <span className="font-bold text-gray-700 dark:text-white tabular-nums">{it.value.toLocaleString()}</span>
+                </div>
+                <div className="mt-1 text-xs text-gray-400 dark:text-emerald-500">{it.pct}% of total</div>
+              </button>
+            ))}
           </div>
         </div>
       </section>
 
+      {/* ── Filters ──────────────────────────────── */}
+      <section className="panel border-l-4 border-emerald-400 dark:border-emerald-600 space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Filters</h3>
+          <div className="ml-auto flex gap-1">
+            {[
+              { key: 'daily', fn: setDaily },
+              { key: 'ytd', fn: setYTD },
+              { key: 'all', fn: clearDates }
+            ].map((p) => (
+              <button key={p.key} type="button" onClick={p.fn}
+                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 transition-all duration-150">
+                {p.key}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="date"
+            value={dateStart}
+            onChange={(e) => { setDateStart(e.target.value); setPage(1); }}
+            className="input py-1.5 text-xs"
+          />
+          <input
+            type="date"
+            value={dateEnd}
+            onChange={(e) => { setDateEnd(e.target.value); setPage(1); }}
+            className="input py-1.5 text-xs"
+          />
+        </div>
+      </section>
+
+      {/* ── Raw Orders Table ─────────────────────── */}
       <section className="panel">
         <header className="mb-3 flex items-center justify-between">
           <div>
-            <p className="section-heading">Table</p>
-            <h3 className="text-lg font-semibold text-emerald-900 dark:text-surface-textOnSurface">Raw Orders</h3>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">Table</p>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Raw Orders</h3>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={exportAllToExcel}
-              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:border-emerald-400 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-surface-textOnSurface"
-              title="Export all filtered rows to Excel"
+              className="btn-sm btn-outline"
+              title="Export all filtered rows to CSV"
             >
-              {/* Simple Excel-like icon (SVG) */}
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <circle cx="12" cy="12" r="11" fill="#1f9d55" />
-                <rect x="7" y="6" width="10" height="12" rx="1.5" fill="#ffffff" />
-                <path d="M9.5 9.5L12 12l-2.5 2.5M14.5 9.5L12 12l2.5 2.5" stroke="#1f9d55" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span>Export</span>
+              Export
             </button>
-            <div>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Search rows..."
-                className="w-56 input-elevated"
-              />
-            </div>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search rows..."
+              className="input w-56"
+            />
           </div>
         </header>
 
-        {loading && <p className="text-emerald-500 dark:text-emerald-200">Loading…</p>}
-        {error && <p className="text-rose-600 dark:text-rose-300">{error}</p>}
+        {loading && (
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-9 w-full" />)}
+          </div>
+        )}
+        {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         {!loading && !error && data && (
-          <div className="overflow-auto max-h-96 rounded border border-emerald-100">
-            <table className="min-w-full border-collapse text-sm">
+          <div className="overflow-auto max-h-[32rem] rounded-xl border border-emerald-100 dark:border-white/[0.06]">
+            <table className="tbl">
               <thead>
                 <tr>
-                  <th className="sticky top-0 bg-emerald-50 border-b border-emerald-200 px-2 py-1 text-left text-emerald-800 w-12">#</th>
-                  {data.columns.map((c) => (
-                    <th key={c} className="sticky top-0 bg-emerald-50 border-b border-emerald-200 px-2 py-1 text-left text-emerald-800">
-                      {c}
-                    </th>
-                  ))}
+                  <th className="w-12">#</th>
+                  {data.columns.map((c) => <th key={c}>{c}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((row, i) => (
-                  <tr key={i} className="border-b border-emerald-50">
-                    <td className="px-2 py-2 whitespace-nowrap text-emerald-700">{(((data.page - 1) * data.pageSize) + i + 1).toLocaleString()}</td>
+                  <tr key={i}>
+                    <td className="text-gray-400 dark:text-emerald-600 tabular-nums">
+                      {(((data.page - 1) * data.pageSize) + i + 1).toLocaleString()}
+                    </td>
                     {data.columns.map((c) => (
-                      <td key={c} className="px-2 py-2 whitespace-nowrap text-emerald-900">
-                        {mapCellDisplay(c, row[c])}
-                      </td>
+                      <td key={c} className="whitespace-nowrap">{mapCellDisplay(c, row[c])}</td>
                     ))}
                   </tr>
                 ))}
@@ -541,22 +549,22 @@ export function SalesOrderAnalysis() {
           </div>
         )}
 
-        <footer className="mt-3 flex items-center justify-between text-sm text-emerald-700">
+        <footer className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-emerald-400">
           <div>
             {data && data.totalRecords > 0 ? (
               <span>
                 Showing {(((data.page - 1) * data.pageSize) + 1).toLocaleString()}–{Math.min(data.page * data.pageSize, data.totalRecords).toLocaleString()} of {data.totalRecords.toLocaleString()}
               </span>
             ) : (
-              <span>\u00A0</span>
+              <span>&nbsp;</span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-emerald-700">Per page</label>
+            <label className="text-gray-500 dark:text-emerald-400">Per page</label>
             <select
               value={pageSize}
               onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-              className="rounded border border-emerald-200 px-2 py-1"
+              className="input w-auto py-1.5 px-2"
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -567,18 +575,18 @@ export function SalesOrderAnalysis() {
               type="button"
               disabled={loading || (data?.page ?? 1) <= 1}
               onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              className="rounded border border-emerald-200 px-3 py-1 disabled:opacity-50"
+              className="btn-sm btn-outline disabled:opacity-40"
             >
               Prev
             </button>
-            <span>
+            <span className="text-gray-600 dark:text-emerald-300">
               Page {data?.page ?? page} / {data?.totalPages ?? '-'}
             </span>
             <button
               type="button"
               disabled={loading || (data?.page ?? 1) >= (data?.totalPages ?? 1)}
               onClick={() => setPage((p) => (data ? Math.min(p + 1, data.totalPages) : p + 1))}
-              className="rounded border border-emerald-200 px-3 py-1 disabled:opacity-50"
+              className="btn-sm btn-outline disabled:opacity-40"
             >
               Next
             </button>
@@ -588,3 +596,4 @@ export function SalesOrderAnalysis() {
     </div>
   );
 }
+

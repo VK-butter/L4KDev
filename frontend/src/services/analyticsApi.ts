@@ -20,7 +20,7 @@ type QueryParams = AnalyticsFilterParams & {
   pageSize?: number;
 };
 
-export type RawOrderRow = Record<string, unknown>;
+type RawOrderRow = Record<string, unknown>;
 
 export interface RawOrdersPage {
   columns: string[];
@@ -29,6 +29,131 @@ export interface RawOrdersPage {
   pageSize: number;
   totalRecords: number;
   totalPages: number;
+}
+
+export interface VsStageFilter {
+  dateStart: string;
+  dateEnd: string;
+  statuses?: string[];
+  channels?: string[];
+  categories?: string[];
+}
+
+export interface VsOptionsResponse {
+  channels: string[];
+  categories: string[];
+}
+
+export interface VsBreakdownItem {
+  key: string;
+  orders: number;
+  revenue: number;
+  quantity: number;
+}
+
+export interface VsStageMetrics {
+  kpi: {
+    totalOrders: number;
+    totalRevenue: number;
+    totalQuantity: number;
+  };
+  topChannels: VsBreakdownItem[];
+  topCategories: VsBreakdownItem[];
+}
+
+export interface VsCompareRequest {
+  stageA: VsStageFilter;
+  stageB: VsStageFilter;
+}
+
+export interface VsPivotCell {
+  orders: number;
+  revenue: number;
+  quantity: number;
+}
+
+export interface VsPivotColumnHeader {
+  channel: string;
+  category: string;
+}
+
+export interface VsPivotMonth {
+  monthIndex: number;
+  label: string;
+  cells: VsPivotCell[];
+}
+
+export interface VsPivotResponse {
+  columnHeaders: VsPivotColumnHeader[];
+  months: VsPivotMonth[];
+}
+
+export interface VsCompareResponse {
+  stageA: VsStageMetrics;
+  stageB: VsStageMetrics;
+  delta: {
+    orders: { absolute: number; percent: number | null };
+    revenue: { absolute: number; percent: number | null };
+    quantity: { absolute: number; percent: number | null };
+  };
+  chart: Array<{ metric: string; stageA: number; stageB: number }>;
+}
+
+export interface SalesTargetFilter {
+  dateStart: string;
+  dateEnd: string;
+  statuses?: string[];
+  channels?: string[];
+  categories?: string[];
+}
+
+export interface SalesTargetOptionsResponse {
+  channels: string[];
+  categories: string[];
+}
+
+export interface SalesTargetBreakdownItem {
+  key: string;
+  actualRevenue: number;
+  targetRevenue: number;
+  gapRevenue: number;
+  achievementPct: number | null;
+}
+
+export interface SalesTargetCompareResponse {
+  kpi: {
+    actualRevenue: number;
+    targetRevenue: number;
+    gapRevenue: number;
+    achievementPct: number | null;
+  };
+  chart: Array<{
+    month: string;
+    actualRevenue: number;
+    targetRevenue: number;
+    gapRevenue: number;
+    achievementPct: number | null;
+  }>;
+  breakdownByChannel: SalesTargetBreakdownItem[];
+  breakdownByCategory: SalesTargetBreakdownItem[];
+}
+
+export interface TargetPivotCell {
+  target: number;
+  actualCurrent: number;
+  actualPrevious: number;
+}
+
+export interface TargetPivotMonth {
+  monthIndex: number;
+  label: string;
+  cells: TargetPivotCell[];
+}
+
+export interface TargetPivotResponse {
+  year: number;
+  columnHeaders: Array<{ channel: string; category: string }>;
+  months: TargetPivotMonth[];
 }
 
 function buildQuery(params: QueryParams) {
@@ -115,4 +240,22 @@ export const analyticsStatusApi = {
       `/analytics/orders/raw/status?${sp.toString()}`
     );
   }
+};
+
+export const analyticsVsApi = {
+  getVsOptions: (stage: VsStageFilter) =>
+    apiClient.post<{ data: VsOptionsResponse }>('/analytics/orders/vs/options', stage),
+  compareVs: (payload: VsCompareRequest) =>
+    apiClient.post<{ data: VsCompareResponse }>('/analytics/orders/vs/compare', payload),
+  getPivot: (stage: VsStageFilter, granularity?: 'daily' | 'monthly' | 'yearly') =>
+    apiClient.post<{ data: VsPivotResponse }>('/analytics/orders/vs/pivot', { ...stage, granularity: granularity ?? 'monthly' })
+};
+
+export const analyticsSalesTargetApi = {
+  getSalesTargetOptions: (filterBase: SalesTargetFilter) =>
+    apiClient.post<{ data: SalesTargetOptionsResponse }>('/analytics/orders/target/options', filterBase),
+  compareSalesTarget: (filter: SalesTargetFilter) =>
+    apiClient.post<{ data: SalesTargetCompareResponse }>('/analytics/orders/target/compare', filter),
+  getTargetPivot: (params: { year: number; statuses?: string[]; channels?: string[]; categories?: string[] }) =>
+    apiClient.post<{ data: TargetPivotResponse }>('/analytics/orders/target/pivot', params)
 };

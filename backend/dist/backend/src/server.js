@@ -18,7 +18,13 @@ const PORT = Number(process.env.PORT ?? 4000);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173';
 app.set('trust proxy', 1);
 app.use(cors({
-    origin: FRONTEND_ORIGIN,
+    origin: (origin, callback) => {
+        const allowed = [FRONTEND_ORIGIN, 'http://localhost:5174', 'http://localhost:5175'];
+        if (!origin || allowed.includes(origin))
+            callback(null, true);
+        else
+            callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true
 }));
 app.use(helmet());

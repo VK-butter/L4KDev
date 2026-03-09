@@ -1,106 +1,129 @@
-# Quickstart — Green Sales Dashboard Mock App
+# Quickstart — Green Sales Dashboard
 
-1. **Install prerequisites**
-   - Node.js 20.x
-   - PNPM 9.x (preferred) or npm 10
+## Prerequisites
 
-2. **Bootstrap workspaces**
-   ```bash
-   pnpm install --recursive
-   ```
-   This installs deps in `frontend/`, `backend/`, and `shared/`.
+- Node.js 20.x
+- pnpm 9.x (`npm install -g pnpm` or use `npx pnpm`)
 
-3. **Seed mock data**
-   ```bash
-   pnpm --filter backend run seed:mocks
-   ```
-   Generates JSON fixtures for sales orders, user accounts (analyst + admin), embedding targets, and audit logs.
+## 1. Install Dependencies
 
-4. **Start development servers**
-   ```bash
-   pnpm --filter backend run dev   # exposes http://localhost:4000
-   pnpm --filter frontend run dev  # exposes http://localhost:5173
-   ```
-   Frontend dev server proxies `/api/*` to the backend.
+```bash
+npx pnpm install
+```
 
-5. **PostgreSQL via SSH tunnel (optional live data)**
-   1. Open a tunnel:
-      ```
-      ssh -N -L 5432:127.0.0.1:5432 <user>@<host>
-      ```
-   2. Create `backend/.env`:
-      ```
-      PGHOST=127.0.0.1
-      PGPORT=5432
-      PGDATABASE=sales_warehouse
-      PGUSER=<db-user>
-      PGPASSWORD=<db-pass>
-      RAW_DATE_COLUMN=Order Date
-      # optional if auto-detect fails
-      # RAW_STATUS_COLUMN=...
-      # RAW_REVENUE_COLUMN=...
-      # RAW_QUANTITY_COLUMN=...
-      ```
-   3. Restart backend.
+Installs deps across `frontend/`, `backend/`, and `shared/` workspaces.
 
-6. **Sales page**
-   - Navigate to `/dashboards/sales` from the sidebar (“Sale order line”).
-   - Use calendar pickers (Daily = yesterday→today; YTD = Jan 1→today; All = clear).
-   - Export all filtered rows (CSV) from the table header.
-   - Status donut (Saled vs Cancel): click labels to filter the table.
+## 2. Seed Mock Data
 
-5. **Demo credentials**
-   - Analyst: `analyst@example.com / Analyst!123`
-   - User Admin: `admin@example.com / Admin!123`
+```bash
+npx pnpm --filter backend run seed:mocks
+```
 
-7. **Testing**
-   ```bash
-   pnpm test                     # runs workspace unit tests (Vitest)
-   pnpm --filter frontend exec playwright install chromium   # one-time browser install
-   pnpm test:e2e                 # executes Playwright flows (auth, admin, analytics, embeds)
-   ```
+Generates JSON fixtures for sales orders, user accounts (analyst + admin), embedding targets, and audit logs in `backend/src/data/mocks/files/`.
 
-8. **Embedding configuration**
-   - Update `shared/config/embeds.ts` to add/remove embed targets (Superset iframe metadata, NocoDB view IDs, project/table slugs, and default limits).
-   - Store credentials in `backend/.env` using `NOCODB_BASE_URL` (e.g., `https://db.learningforkidz.com`) and `NOCODB_API_TOKEN` (PAT with read access). The backend proxy at `/api/analytics/embeds/nocodb/:id/records` handles all REST calls so the browser never sees secrets.
+## 3. Configure Environment
 
-9. **Environment variables**
-   - Create `backend/.env` with:
-     ```
-     PORT=4000
-     SESSION_SECRET=replace-me
-     FRONTEND_ORIGIN=http://localhost:5173
-     ```
-   - Create `frontend/.env` with:
-     ```
-     VITE_API_BASE_URL=http://localhost:4000
-     FRONTEND_PORT=5173
-   ```
-   - Restart dev servers after editing env files to ensure session + proxy configs reload.
+Create `backend/.env`:
 
-9. **Manual verification – User Story 1**
-   1. Start backend (`pnpm --filter backend run dev`) and frontend (`pnpm --filter frontend run dev`).
-   2. Visit `http://localhost:5173/login`.
-   3. Sign in with `admin@example.com / Admin!123` and confirm redirect to `/` shows the dashboard shell, nav, and sidebar.
-   4. Click the `Logout` button in the top-right corner and ensure you return to `/login`.
-   5. Attempt to log in with an invalid password and confirm an inline error appears while the route stays on `/login`.
+```
+PORT=4000
+FRONTEND_ORIGIN=http://localhost:5173
+PGHOST=127.0.0.1
+PGPORT=5432
+PGDATABASE=sales_warehouse
+PGUSER=<db-user>
+PGPASSWORD=<db-pass>
+NOCODB_BASE_URL=https://db.learningforkidz.com
+NOCODB_API_TOKEN=<token>
+```
 
-10. **Manual verification – User Story 2**
-    1. Log in as the admin account and click the `Admin Menu` button in the top navigation.
-    2. In the side panel, click `Add account`, enter a unique email + display name, and save—confirm the new account appears in the list with `active` status.
-    3. Click `Edit` for the new account, change the display name, and verify the list updates.
-    4. Click `Deactivate` for the same account and confirm its status pill switches to `inactive`.
-    5. Close the admin panel and confirm analysts do not see the `Admin Menu` button.
+Create `frontend/.env` (optional):
 
-11. **Manual verification – User Story 3**
-    1. Log in as either analyst or admin and confirm the KPI board, revenue-by-category chart, trend chart, and drill-down table render with data (use default date range).
-    2. Adjust the date range inputs (e.g., limit to the last 14 days) and observe KPIs, charts, and drill-down results update within 1s.
-    3. Toggle the status checkboxes (e.g., enable only `Fulfilled`) and verify charts refresh and drill-down records reflect only the selected status.
-    4. Click a bar in the Revenue by Category chart to drill into that category; ensure the drill-down panel shows the category chip and only orders from that category, then clear the drill-down.
-    5. Use the pagination controls in the drill-down panel to move between pages and confirm results change accordingly.
+```
+VITE_API_BASE_URL=http://localhost:4000
+```
 
-12. **Manual verification – User Story 4**
-    1. Scroll to “Embedding Playground” on the dashboard and confirm the NocoDB tabs render.
-    2. Select each tab and ensure the inline table loads data via the backend proxy (rows update when you refresh the card; errors surface inline without crashing the page).
-    3. If you still need the Superset placeholder, ensure its iframe renders plus the integration note describing SSH tunnel configuration.
-    4. Review `frontend/src/components/embeds/README.md` and confirm it explains the iframe vs. API approach along with the required env vars.
+## 4. Start Development Servers
+
+```bash
+# Terminal 1
+npx pnpm --filter backend run dev    # http://localhost:4000
+
+# Terminal 2
+npx pnpm --filter frontend run dev   # http://localhost:5173
+```
+
+Frontend dev server proxies all `/api/*` requests to the backend.
+
+## 5. Demo Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| Analyst | `analyst@example.com` | `Analyst!123` |
+| Admin | `admin@example.com` | `Admin!123` |
+
+## 6. PostgreSQL via SSH Tunnel (Live Data)
+
+The database is hosted remotely and requires an SSH tunnel:
+
+```bash
+ssh -N -L 5432:127.0.0.1:5432 dbtunnel@49.0.67.25
+```
+
+Keep this terminal running while using live data. Configure the `PG*` env vars in `backend/.env` and restart the backend.
+
+Optional column mapping overrides (if auto-detection fails):
+
+```
+RAW_DATE_COLUMN=Order Date
+RAW_STATUS_COLUMN=status
+RAW_REVENUE_COLUMN=revenue
+RAW_QUANTITY_COLUMN=quantity
+RAW_MAX_PAGE_SIZE=1000
+```
+
+## 7. Testing
+
+```bash
+# Unit tests (Vitest)
+npx pnpm test
+
+# Install Playwright browsers (one-time)
+npx pnpm --filter frontend exec playwright install chromium
+
+# E2E tests
+npx pnpm test:e2e
+```
+
+## 8. Embedding Configuration
+
+Update `shared/config/embeds.ts` to add/remove embed targets (Superset iframe metadata, NocoDB view IDs, project/table slugs, and default limits).
+
+NocoDB credentials go in `backend/.env` (`NOCODB_BASE_URL`, `NOCODB_API_TOKEN`). The backend proxy at `/api/analytics/embeds/nocodb/:id/records` handles all REST calls so the browser never sees secrets.
+
+## 9. Manual Verification
+
+### Auth Shell
+1. Visit `http://localhost:5173/login`.
+2. Sign in with `admin@example.com / Admin!123` — confirm redirect to `/`.
+3. Click `Logout` — confirm redirect back to `/login`.
+4. Try invalid password — confirm inline error on `/login`.
+
+### Admin Panel
+1. Log in as admin, click `Admin Menu` in the top nav.
+2. Click `Add account`, fill in email + display name, save — confirm new account appears as `active`.
+3. Click `Edit`, change display name — confirm list updates.
+4. Click `Deactivate` — confirm status changes to `inactive`.
+5. Confirm analysts do not see the `Admin Menu` button.
+
+### Analytics
+1. Log in as analyst or admin, confirm KPI board, revenue chart, trend chart, and drilldown table render.
+2. Adjust date range — confirm all data refreshes within 1s.
+3. Toggle status checkboxes — confirm charts and drilldown update.
+4. Click a bar in the Revenue by Category chart — confirm drilldown filters to that category.
+5. Use pagination in the drilldown panel — confirm rows change.
+
+### Embeds
+1. Navigate to the Embedding Playground.
+2. Select NocoDB tabs — confirm inline tables load via the backend proxy.
+3. Confirm errors surface inline without crashing the page.

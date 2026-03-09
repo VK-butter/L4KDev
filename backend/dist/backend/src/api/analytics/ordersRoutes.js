@@ -34,6 +34,24 @@ const drilldownSchema = baseFiltersSchema.extend({
         .optional()
         .transform((value) => (value ? Number(value) : undefined))
 });
+const vsStageFilterSchema = z.object({
+    dateStart: isoDateSchema,
+    dateEnd: isoDateSchema,
+    statuses: z.array(z.string()).optional().default([]),
+    channels: z.array(z.string()).optional().default([]),
+    categories: z.array(z.string()).optional().default([])
+});
+const vsCompareSchema = z.object({
+    stageA: vsStageFilterSchema,
+    stageB: vsStageFilterSchema
+});
+const salesTargetFilterSchema = z.object({
+    dateStart: isoDateSchema,
+    dateEnd: isoDateSchema,
+    statuses: z.array(z.string()).optional().default([]),
+    channels: z.array(z.string()).optional().default([]),
+    categories: z.array(z.string()).optional().default([])
+});
 router.get('/orders/summary', async (req, res, next) => {
     try {
         const filters = baseFiltersSchema.parse(req.query);
@@ -277,6 +295,465 @@ async function sumAmountColumn(client, table) {
     const res = await client.query(sql);
     return res.rows[0]?.total !== undefined ? Number(res.rows[0].total) : null;
 }
+function toUniqueStrings(values) {
+    const normalized = values
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+    return Array.from(new Set(normalized));
+}
+function normalizeVsStatuses(values) {
+    const mapped = values
+        .map((s) => s.trim().toLowerCase())
+        .map((s) => {
+        if (['complete', 'completed', 'saled', 'fulfilled'].includes(s))
+            return 'Complete';
+        if (['cancel', 'cancelled', 'canceled'].includes(s))
+            return 'Cancel';
+        if (s === 'unknown')
+            return 'Unknown';
+        return null;
+    })
+        .filter((s) => Boolean(s));
+    return Array.from(new Set(mapped));
+}
+function pickColumn(fieldNames, candidates) {
+    for (const candidate of candidates) {
+        const exact = fieldNames.find((name) => normalizeKey(name) === normalizeKey(candidate));
+        if (exact)
+            return exact;
+    }
+    for (const candidate of candidates) {
+        const contains = fieldNames.find((name) => normalizeKey(name).includes(normalizeKey(candidate)));
+        if (contains)
+            return contains;
+    }
+    return null;
+}
+function resolveVsColumns(fieldNames) {
+    const envDate = process.env.RAW_DATE_COLUMN?.trim();
+    const envStatus = process.env.RAW_STATUS_COLUMN?.trim();
+    const envRevenue = process.env.RAW_REVENUE_COLUMN?.trim();
+    const envQty = process.env.RAW_QUANTITY_COLUMN?.trim();
+    const date = (envDate && fieldNames.find((n) => n === envDate)) ||
+        pickColumn(fieldNames, ['order date', 'date_order', 'orderdate', 'date']) ||
+        'order_date';
+    return {
+        date,
+        status: (envStatus && fieldNames.find((n) => n === envStatus)) ||
+            pickColumn(fieldNames, ['status', 'orderstatus', 'itemstatus', 'sale_status', '\u0e2a\u0e16\u0e32\u0e19\u0e30']),
+        revenue: (envRevenue && fieldNames.find((n) => n === envRevenue)) ||
+            pickColumn(fieldNames, ['\u0e23\u0e27\u0e21\u0e23\u0e32\u0e04\u0e32', 'revenue', 'amount', 'totalprice', 'price', '\u0e22\u0e2d\u0e14\u0e23\u0e27\u0e21']),
+        quantity: (envQty && fieldNames.find((n) => n === envQty)) ||
+            pickColumn(fieldNames, ['order lines/quantity', 'quantity', 'qty', '\u0e08\u0e33\u0e19\u0e27\u0e19', '\u0e22\u0e2d\u0e14\u0e02\u0e32\u0e22\u0e08\u0e33\u0e19\u0e27\u0e19']),
+        channel: pickColumn(fieldNames, ['\u0e0a\u0e48\u0e2d\u0e07\u0e17\u0e32\u0e07', 'channel', 'customer_type', 'type']),
+        customer: pickColumn(fieldNames, ['customer', 'display_name', 'order_partner', '\u0e25\u0e39\u0e01\u0e04\u0e49\u0e32']),
+        category: pickColumn(fieldNames, ['\u0e2b\u0e21\u0e27\u0e14\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32', 'category', 'product_category']),
+        order: pickColumn(fieldNames, ['order_name', 'order', 'name'])
+    };
+}
+async function canUseCustomerTypeMap(client) {
+    const result = await client.query(`
+    SELECT
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'l4k_model' AND table_name = 'customer_type' AND column_name = 'Title'
+      ) AS has_title,
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'l4k_model' AND table_name = 'customer_type' AND column_name = 'type'
+      ) AS has_type
+  `);
+    return Boolean(result.rows[0]?.has_title) && Boolean(result.rows[0]?.has_type);
+}
+function buildVsScopedQuery(stage, columns, useCustomerTypeMap, includeDimensionFilters) {
+    const params = [stage.dateStart, stage.dateEnd];
+    const dateExpr = `j.${quoteIdent(columns.date)}`;
+    const orderExpr = columns.order
+        ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.order)} AS TEXT)), ''), j.ctid::text)`
+        : 'j.ctid::text';
+    const revenueExpr = columns.revenue
+        ? `COALESCE(CAST(j.${quoteIdent(columns.revenue)} AS numeric), 0)`
+        : '0::numeric';
+    const qtyExpr = columns.quantity
+        ? `COALESCE(CAST(j.${quoteIdent(columns.quantity)} AS numeric), 0)`
+        : '0::numeric';
+    const categoryExpr = columns.category
+        ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.category)} AS TEXT)), ''), 'Unknown')`
+        : `'Unknown'`;
+    const customerExpr = columns.customer
+        ? `NULLIF(TRIM(CAST(j.${quoteIdent(columns.customer)} AS TEXT)), '')`
+        : 'NULL';
+    const statusExpr = columns.status
+        ? `CASE
+      WHEN LOWER(TRIM(CAST(j.${quoteIdent(columns.status)} AS TEXT))) IN ('complete', 'completed', 'saled', 'fulfilled') THEN 'Complete'
+      WHEN LOWER(TRIM(CAST(j.${quoteIdent(columns.status)} AS TEXT))) IN ('cancel', 'cancelled', 'canceled') THEN 'Cancel'
+      ELSE 'Unknown'
+    END`
+        : `'Unknown'`;
+    const joinCustomerType = useCustomerTypeMap && columns.customer
+        ? `LEFT JOIN (
+          SELECT
+            TRIM(CAST("Title" AS TEXT)) AS title_key,
+            MIN(CAST("type" AS TEXT)) AS mapped_type
+          FROM l4k_model.customer_type
+          GROUP BY TRIM(CAST("Title" AS TEXT))
+        ) ct ON ${customerExpr} = ct.title_key`
+        : '';
+    const channelExpr = useCustomerTypeMap && columns.customer
+        ? `COALESCE(NULLIF(TRIM(ct.mapped_type), ''), 'Unknown')`
+        : `'Unknown'`;
+    const whereParts = [`${dateExpr}::date BETWEEN $1 AND $2`];
+    const normalizedStatuses = normalizeVsStatuses(stage.statuses ?? []);
+    if (normalizedStatuses.length > 0) {
+        params.push(normalizedStatuses);
+        whereParts.push(`${statusExpr} = ANY($${params.length}::text[])`);
+    }
+    const filteredParts = ['1=1'];
+    if (includeDimensionFilters) {
+        const channels = toUniqueStrings(stage.channels ?? []).map((v) => v.toLowerCase());
+        const categories = toUniqueStrings(stage.categories ?? []).map((v) => v.toLowerCase());
+        if (channels.length > 0) {
+            params.push(channels);
+            filteredParts.push(`LOWER(channel) = ANY($${params.length}::text[])`);
+        }
+        if (categories.length > 0) {
+            params.push(categories);
+            filteredParts.push(`LOWER(category) = ANY($${params.length}::text[])`);
+        }
+    }
+    const cteSql = `
+    WITH scoped AS (
+      SELECT
+        ${orderExpr} AS order_key,
+        ${revenueExpr} AS revenue,
+        ${qtyExpr} AS quantity,
+        ${categoryExpr} AS category,
+        ${channelExpr} AS channel,
+        ${statusExpr} AS normalized_status
+      FROM l4k_model.joinsales_orderline j
+      ${joinCustomerType}
+      WHERE ${whereParts.join(' AND ')}
+    ),
+    filtered AS (
+      SELECT * FROM scoped
+      WHERE ${filteredParts.join(' AND ')}
+    )
+  `;
+    return { cteSql, params };
+}
+async function getVsOptions(client, stage, columns, useCustomerTypeMap) {
+    const baseStage = { ...stage, channels: [], categories: [] };
+    const { cteSql, params } = buildVsScopedQuery(baseStage, columns, useCustomerTypeMap, false);
+    const [channelsResult, categoriesResult] = await Promise.all([
+        client.query(`${cteSql} SELECT DISTINCT channel FROM filtered ORDER BY channel`, params),
+        client.query(`${cteSql} SELECT DISTINCT category FROM filtered ORDER BY category`, params)
+    ]);
+    return {
+        channels: channelsResult.rows.map((r) => String(r.channel ?? 'Unknown')),
+        categories: categoriesResult.rows.map((r) => String(r.category ?? 'Unknown'))
+    };
+}
+async function getVsStageMetrics(client, stage, columns, useCustomerTypeMap) {
+    const { cteSql, params } = buildVsScopedQuery(stage, columns, useCustomerTypeMap, true);
+    const [summaryResult, channelsResult, categoriesResult] = await Promise.all([
+        client.query(`${cteSql}
+       SELECT
+         COUNT(DISTINCT order_key)::bigint AS total_orders,
+         COALESCE(SUM(revenue), 0)::numeric AS total_revenue,
+         COALESCE(SUM(quantity), 0)::numeric AS total_quantity
+       FROM filtered`, params),
+        client.query(`${cteSql}
+       SELECT
+         channel AS key,
+         COUNT(DISTINCT order_key)::bigint AS orders,
+         COALESCE(SUM(revenue), 0)::numeric AS revenue,
+         COALESCE(SUM(quantity), 0)::numeric AS quantity
+       FROM filtered
+       GROUP BY channel
+       ORDER BY revenue DESC, channel ASC
+       LIMIT 10`, params),
+        client.query(`${cteSql}
+       SELECT
+         category AS key,
+         COUNT(DISTINCT order_key)::bigint AS orders,
+         COALESCE(SUM(revenue), 0)::numeric AS revenue,
+         COALESCE(SUM(quantity), 0)::numeric AS quantity
+       FROM filtered
+       GROUP BY category
+       ORDER BY revenue DESC, category ASC
+       LIMIT 10`, params)
+    ]);
+    const summary = summaryResult.rows[0] ?? {};
+    return {
+        kpi: {
+            totalOrders: Number(summary.total_orders ?? 0),
+            totalRevenue: Number(summary.total_revenue ?? 0),
+            totalQuantity: Number(summary.total_quantity ?? 0)
+        },
+        topChannels: channelsResult.rows.map((row) => ({
+            key: String(row.key ?? 'Unknown'),
+            orders: Number(row.orders ?? 0),
+            revenue: Number(row.revenue ?? 0),
+            quantity: Number(row.quantity ?? 0)
+        })),
+        topCategories: categoriesResult.rows.map((row) => ({
+            key: String(row.key ?? 'Unknown'),
+            orders: Number(row.orders ?? 0),
+            revenue: Number(row.revenue ?? 0),
+            quantity: Number(row.quantity ?? 0)
+        }))
+    };
+}
+function percentDelta(current, baseline) {
+    if (baseline === 0)
+        return null;
+    return ((current - baseline) / baseline) * 100;
+}
+function normalizeSalesTargetChannelValue(value) {
+    const trimmed = value.trim();
+    if (trimmed.toLowerCase() === '\u0e02\u0e32\u0e22\u0e02\u0e32\u0e14') {
+        return '\u0e15\u0e31\u0e27\u0e41\u0e17\u0e19\u0e0b\u0e37\u0e49\u0e2d\u0e02\u0e32\u0e14';
+    }
+    return trimmed;
+}
+function salesTargetChannelSql(expr) {
+    return `CASE
+    WHEN LOWER(${expr}) = LOWER('\u0e02\u0e32\u0e22\u0e02\u0e32\u0e14') THEN '\u0e15\u0e31\u0e27\u0e41\u0e17\u0e19\u0e0b\u0e37\u0e49\u0e2d\u0e02\u0e32\u0e14'
+    ELSE ${expr}
+  END`;
+}
+function buildSalesTargetActualScopedQuery(filter, columns, useCustomerTypeMap, includeDimensionFilters) {
+    const params = [filter.dateStart, filter.dateEnd];
+    const dateExpr = `j.${quoteIdent(columns.date)}`;
+    const revenueExpr = columns.revenue
+        ? `COALESCE(CAST(j.${quoteIdent(columns.revenue)} AS numeric), 0)`
+        : '0::numeric';
+    const statusExpr = columns.status
+        ? `CASE
+      WHEN LOWER(TRIM(CAST(j.${quoteIdent(columns.status)} AS TEXT))) IN ('complete', 'completed', 'saled', 'fulfilled') THEN 'Complete'
+      WHEN LOWER(TRIM(CAST(j.${quoteIdent(columns.status)} AS TEXT))) IN ('cancel', 'cancelled', 'canceled') THEN 'Cancel'
+      ELSE 'Unknown'
+    END`
+        : `'Unknown'`;
+    const categoryExpr = columns.category
+        ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.category)} AS TEXT)), ''), 'Unknown')`
+        : `'Unknown'`;
+    const customerExpr = columns.customer
+        ? `NULLIF(TRIM(CAST(j.${quoteIdent(columns.customer)} AS TEXT)), '')`
+        : 'NULL';
+    const joinCustomerType = !columns.channel && useCustomerTypeMap && columns.customer
+        ? `LEFT JOIN (
+          SELECT
+            TRIM(CAST("Title" AS TEXT)) AS title_key,
+            MIN(CAST("type" AS TEXT)) AS mapped_type
+          FROM l4k_model.customer_type
+          GROUP BY TRIM(CAST("Title" AS TEXT))
+        ) ct ON ${customerExpr} = ct.title_key`
+        : '';
+    const rawChannelExpr = columns.channel
+        ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.channel)} AS TEXT)), ''), 'Unknown')`
+        : !columns.channel && useCustomerTypeMap && columns.customer
+            ? `COALESCE(NULLIF(TRIM(ct.mapped_type), ''), 'Unknown')`
+            : `'Unknown'`;
+    const channelExpr = salesTargetChannelSql(rawChannelExpr);
+    const whereParts = [`${dateExpr}::date BETWEEN $1 AND $2`];
+    const normalizedStatuses = normalizeVsStatuses(filter.statuses ?? []);
+    if (normalizedStatuses.length > 0) {
+        params.push(normalizedStatuses);
+        whereParts.push(`${statusExpr} = ANY($${params.length}::text[])`);
+    }
+    const filteredParts = ['1=1'];
+    if (includeDimensionFilters) {
+        const channels = toUniqueStrings(filter.channels ?? [])
+            .map((v) => normalizeSalesTargetChannelValue(v).toLowerCase());
+        const categories = toUniqueStrings(filter.categories ?? []).map((v) => v.toLowerCase());
+        if (channels.length > 0) {
+            params.push(channels);
+            filteredParts.push(`LOWER(channel) = ANY($${params.length}::text[])`);
+        }
+        if (categories.length > 0) {
+            params.push(categories);
+            filteredParts.push(`LOWER(category) = ANY($${params.length}::text[])`);
+        }
+    }
+    const cteSql = `
+    WITH actual_scoped AS (
+      SELECT
+        date_trunc('month', ${dateExpr}::date)::date AS month_key,
+        ${channelExpr} AS channel,
+        ${categoryExpr} AS category,
+        ${revenueExpr} AS revenue
+      FROM l4k_model.joinsales_orderline j
+      ${joinCustomerType}
+      WHERE ${whereParts.join(' AND ')}
+    ),
+    actual_filtered AS (
+      SELECT * FROM actual_scoped
+      WHERE ${filteredParts.join(' AND ')}
+    )
+  `;
+    return { cteSql, params };
+}
+function buildSalesTargetTargetScopedQuery(filter, includeDimensionFilters) {
+    const params = [filter.dateStart, filter.dateEnd];
+    const monthExpr = `date_trunc('month', ((t.target_month + interval '7 hour')::date))::date`;
+    const rawChannelExpr = `COALESCE(NULLIF(TRIM(CAST(t.channel AS TEXT)), ''), 'Unknown')`;
+    const channelExpr = salesTargetChannelSql(rawChannelExpr);
+    const categoryExpr = `COALESCE(NULLIF(TRIM(CAST(t.category AS TEXT)), ''), 'Unknown')`;
+    const whereParts = [
+        `${monthExpr} BETWEEN date_trunc('month', $1::date)::date AND date_trunc('month', $2::date)::date`
+    ];
+    const filteredParts = ['1=1'];
+    if (includeDimensionFilters) {
+        const channels = toUniqueStrings(filter.channels ?? [])
+            .map((v) => normalizeSalesTargetChannelValue(v).toLowerCase());
+        const categories = toUniqueStrings(filter.categories ?? []).map((v) => v.toLowerCase());
+        if (channels.length > 0) {
+            params.push(channels);
+            filteredParts.push(`LOWER(channel) = ANY($${params.length}::text[])`);
+        }
+        if (categories.length > 0) {
+            params.push(categories);
+            filteredParts.push(`LOWER(category) = ANY($${params.length}::text[])`);
+        }
+    }
+    const cteSql = `
+    WITH target_scoped AS (
+      SELECT
+        ${monthExpr} AS month_key,
+        ${channelExpr} AS channel,
+        ${categoryExpr} AS category,
+        COALESCE(CAST(t.target AS numeric), 0) AS target_revenue
+      FROM l4k_model.product_sales_target t
+      WHERE ${whereParts.join(' AND ')}
+    ),
+    target_filtered AS (
+      SELECT * FROM target_scoped
+      WHERE ${filteredParts.join(' AND ')}
+    )
+  `;
+    return { cteSql, params };
+}
+function toIsoDateKey(value) {
+    if (value instanceof Date)
+        return value.toISOString().slice(0, 10);
+    return String(value ?? '').slice(0, 10);
+}
+function mergeRevenueBreakdown(actualRows, targetRows) {
+    const actualMap = new Map(actualRows.map((row) => [String(row.key ?? 'Unknown'), Number(row.actual_revenue ?? 0)]));
+    const targetMap = new Map(targetRows.map((row) => [String(row.key ?? 'Unknown'), Number(row.target_revenue ?? 0)]));
+    const keys = new Set([...actualMap.keys(), ...targetMap.keys()]);
+    const rows = Array.from(keys).map((key) => {
+        const actualRevenue = actualMap.get(key) ?? 0;
+        const targetRevenue = targetMap.get(key) ?? 0;
+        const gapRevenue = actualRevenue - targetRevenue;
+        return {
+            key,
+            actualRevenue,
+            targetRevenue,
+            gapRevenue,
+            achievementPct: targetRevenue === 0 ? null : (actualRevenue / targetRevenue) * 100
+        };
+    });
+    rows.sort((a, b) => Math.abs(b.gapRevenue) - Math.abs(a.gapRevenue) || a.key.localeCompare(b.key, 'th'));
+    return rows;
+}
+async function getSalesTargetOptions(client, filter, columns, useCustomerTypeMap) {
+    const baseFilter = { ...filter, channels: [], categories: [] };
+    const { cteSql: actualSql, params: actualParams } = buildSalesTargetActualScopedQuery(baseFilter, columns, useCustomerTypeMap, false);
+    const { cteSql: targetSql, params: targetParams } = buildSalesTargetTargetScopedQuery(baseFilter, false);
+    const [actualChannels, actualCategories, targetChannels, targetCategories] = await Promise.all([
+        client.query(`${actualSql} SELECT DISTINCT channel FROM actual_filtered ORDER BY channel`, actualParams),
+        client.query(`${actualSql} SELECT DISTINCT category FROM actual_filtered ORDER BY category`, actualParams),
+        client.query(`${targetSql} SELECT DISTINCT channel FROM target_filtered ORDER BY channel`, targetParams),
+        client.query(`${targetSql} SELECT DISTINCT category FROM target_filtered ORDER BY category`, targetParams)
+    ]);
+    const channelSet = new Set();
+    const categorySet = new Set();
+    for (const row of [...actualChannels.rows, ...targetChannels.rows]) {
+        channelSet.add(String(row.channel ?? 'Unknown'));
+    }
+    for (const row of [...actualCategories.rows, ...targetCategories.rows]) {
+        categorySet.add(String(row.category ?? 'Unknown'));
+    }
+    return {
+        channels: Array.from(channelSet).sort((a, b) => a.localeCompare(b, 'th')),
+        categories: Array.from(categorySet).sort((a, b) => a.localeCompare(b, 'th'))
+    };
+}
+async function getSalesTargetCompare(client, filter, columns, useCustomerTypeMap) {
+    const { cteSql: actualSql, params: actualParams } = buildSalesTargetActualScopedQuery(filter, columns, useCustomerTypeMap, true);
+    const { cteSql: targetSql, params: targetParams } = buildSalesTargetTargetScopedQuery(filter, true);
+    const [monthSeriesResult, actualSummaryResult, actualMonthlyResult, actualByChannelResult, actualByCategoryResult, targetSummaryResult, targetMonthlyResult, targetByChannelResult, targetByCategoryResult] = await Promise.all([
+        client.query(`SELECT generate_series(
+          date_trunc('month', $1::date)::date,
+          date_trunc('month', $2::date)::date,
+          interval '1 month'
+        )::date AS month_key`, [filter.dateStart, filter.dateEnd]),
+        client.query(`${actualSql}
+       SELECT COALESCE(SUM(revenue), 0)::numeric AS actual_revenue
+       FROM actual_filtered`, actualParams),
+        client.query(`${actualSql}
+       SELECT month_key, COALESCE(SUM(revenue), 0)::numeric AS actual_revenue
+       FROM actual_filtered
+       GROUP BY month_key
+       ORDER BY month_key`, actualParams),
+        client.query(`${actualSql}
+       SELECT channel AS key, COALESCE(SUM(revenue), 0)::numeric AS actual_revenue
+       FROM actual_filtered
+       GROUP BY channel`, actualParams),
+        client.query(`${actualSql}
+       SELECT category AS key, COALESCE(SUM(revenue), 0)::numeric AS actual_revenue
+       FROM actual_filtered
+       GROUP BY category`, actualParams),
+        client.query(`${targetSql}
+       SELECT COALESCE(SUM(target_revenue), 0)::numeric AS target_revenue
+       FROM target_filtered`, targetParams),
+        client.query(`${targetSql}
+       SELECT month_key, COALESCE(SUM(target_revenue), 0)::numeric AS target_revenue
+       FROM target_filtered
+       GROUP BY month_key
+       ORDER BY month_key`, targetParams),
+        client.query(`${targetSql}
+       SELECT channel AS key, COALESCE(SUM(target_revenue), 0)::numeric AS target_revenue
+       FROM target_filtered
+       GROUP BY channel`, targetParams),
+        client.query(`${targetSql}
+       SELECT category AS key, COALESCE(SUM(target_revenue), 0)::numeric AS target_revenue
+       FROM target_filtered
+       GROUP BY category`, targetParams)
+    ]);
+    const actualRevenue = Number(actualSummaryResult.rows[0]?.actual_revenue ?? 0);
+    const targetRevenue = Number(targetSummaryResult.rows[0]?.target_revenue ?? 0);
+    const gapRevenue = actualRevenue - targetRevenue;
+    const achievementPct = targetRevenue === 0 ? null : (actualRevenue / targetRevenue) * 100;
+    const actualMonthlyMap = new Map(actualMonthlyResult.rows.map((row) => [toIsoDateKey(row.month_key), Number(row.actual_revenue ?? 0)]));
+    const targetMonthlyMap = new Map(targetMonthlyResult.rows.map((row) => [toIsoDateKey(row.month_key), Number(row.target_revenue ?? 0)]));
+    const chart = monthSeriesResult.rows.map((row) => {
+        const monthKey = toIsoDateKey(row.month_key);
+        const actual = actualMonthlyMap.get(monthKey) ?? 0;
+        const target = targetMonthlyMap.get(monthKey) ?? 0;
+        const gap = actual - target;
+        return {
+            month: monthKey.slice(0, 7),
+            actualRevenue: actual,
+            targetRevenue: target,
+            gapRevenue: gap,
+            achievementPct: target === 0 ? null : (actual / target) * 100
+        };
+    });
+    return {
+        kpi: {
+            actualRevenue,
+            targetRevenue,
+            gapRevenue,
+            achievementPct
+        },
+        chart,
+        breakdownByChannel: mergeRevenueBreakdown(actualByChannelResult.rows, targetByChannelResult.rows),
+        breakdownByCategory: mergeRevenueBreakdown(actualByCategoryResult.rows, targetByCategoryResult.rows)
+    };
+}
 // Raw rows preview from PostgreSQL table for Sale Order Analysis
 // GET /api/analytics/orders/raw?page=1&pageSize=50
 router.get('/orders/raw', async (req, res, next) => {
@@ -426,7 +903,8 @@ router.get('/orders/raw/summary', async (req, res, next) => {
             dateEnd: z
                 .string()
                 .optional()
-                .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd')
+                .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd'),
+            status: z.string().optional()
         })
             .parse(req.query);
         const client = await getPool().connect();
@@ -434,6 +912,7 @@ router.get('/orders/raw/summary', async (req, res, next) => {
             const sample = await client.query('SELECT * FROM l4k_model.joinsales_orderline LIMIT 0');
             const fieldNames = sample.fields.map((f) => f.name);
             const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9\u0E00-\u0E7F]/g, '');
+            const normalizeStatus = normalize;
             const envDate = process.env.RAW_DATE_COLUMN;
             let chosenDate = envDate && envDate.trim().length > 0 ? envDate : '';
             if (!chosenDate) {
@@ -461,11 +940,29 @@ router.get('/orders/raw/summary', async (req, res, next) => {
                 });
                 chosenQty = matchQty ?? '';
             }
-            const hasDateFilter = querySchema.dateStart && querySchema.dateEnd;
-            const where = hasDateFilter ? `WHERE (${dateColumn}::date BETWEEN $1 AND $2)` : '';
-            const params = hasDateFilter
-                ? [querySchema.dateStart, querySchema.dateEnd]
-                : [];
+            // Detect status column for optional status filtering
+            const envStatus = process.env.RAW_STATUS_COLUMN;
+            const statusCandidates = ['status', 'orderstatus', 'itemstatus', 'saled', 'sale_status', 'สถานะ'];
+            let chosenStatus = envStatus && envStatus.trim().length > 0 ? envStatus : '';
+            if (!chosenStatus) {
+                const match = fieldNames.find((n) => {
+                    const key = normalizeStatus(n);
+                    return statusCandidates.some((c) => key === c || key.includes(c));
+                });
+                chosenStatus = match ?? 'status';
+            }
+            const statusColumn = `"${chosenStatus.replace(/"/g, '""')}"`;
+            const filters = [];
+            const params = [];
+            if (querySchema.dateStart && querySchema.dateEnd) {
+                filters.push(`(${dateColumn}::date BETWEEN $${params.length + 1} AND $${params.length + 2})`);
+                params.push(querySchema.dateStart, querySchema.dateEnd);
+            }
+            if (querySchema.status) {
+                filters.push(`${statusColumn} = $${params.length + 1}`);
+                params.push(querySchema.status);
+            }
+            const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
             const selectParts = ['COUNT(*)::bigint AS cnt'];
             if (chosenRev)
                 selectParts.push(`SUM("${chosenRev.replace(/"/g, '""')}")::numeric AS revenue`);
@@ -540,6 +1037,286 @@ router.get('/orders/raw/status', async (req, res, next) => {
             const rows = result.rows.map((r) => ({ status: String(r.status ?? ''), count: Number(r.cnt ?? 0) }));
             const total = rows.reduce((acc, r) => acc + r.count, 0);
             res.json({ data: { total, rows } });
+        }
+        finally {
+            client.release();
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post('/orders/vs/options', async (req, res, next) => {
+    try {
+        const stage = vsStageFilterSchema.parse(req.body ?? {});
+        const client = await getPool().connect();
+        try {
+            const sample = await client.query('SELECT * FROM l4k_model.joinsales_orderline LIMIT 0');
+            const fieldNames = sample.fields.map((f) => f.name);
+            const columns = resolveVsColumns(fieldNames);
+            const useCustomerTypeMap = await canUseCustomerTypeMap(client);
+            const data = await getVsOptions(client, stage, columns, useCustomerTypeMap);
+            res.json({ data });
+        }
+        finally {
+            client.release();
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post('/orders/vs/compare', async (req, res, next) => {
+    try {
+        const payload = vsCompareSchema.parse(req.body ?? {});
+        const client = await getPool().connect();
+        try {
+            const sample = await client.query('SELECT * FROM l4k_model.joinsales_orderline LIMIT 0');
+            const fieldNames = sample.fields.map((f) => f.name);
+            const columns = resolveVsColumns(fieldNames);
+            const useCustomerTypeMap = await canUseCustomerTypeMap(client);
+            const [stageA, stageB] = await Promise.all([
+                getVsStageMetrics(client, payload.stageA, columns, useCustomerTypeMap),
+                getVsStageMetrics(client, payload.stageB, columns, useCustomerTypeMap)
+            ]);
+            const chart = [
+                {
+                    metric: 'Orders',
+                    stageA: stageA.kpi.totalOrders,
+                    stageB: stageB.kpi.totalOrders
+                },
+                {
+                    metric: 'Revenue',
+                    stageA: stageA.kpi.totalRevenue,
+                    stageB: stageB.kpi.totalRevenue
+                },
+                {
+                    metric: 'Qty',
+                    stageA: stageA.kpi.totalQuantity,
+                    stageB: stageB.kpi.totalQuantity
+                }
+            ];
+            const delta = {
+                orders: {
+                    absolute: stageA.kpi.totalOrders - stageB.kpi.totalOrders,
+                    percent: percentDelta(stageA.kpi.totalOrders, stageB.kpi.totalOrders)
+                },
+                revenue: {
+                    absolute: stageA.kpi.totalRevenue - stageB.kpi.totalRevenue,
+                    percent: percentDelta(stageA.kpi.totalRevenue, stageB.kpi.totalRevenue)
+                },
+                quantity: {
+                    absolute: stageA.kpi.totalQuantity - stageB.kpi.totalQuantity,
+                    percent: percentDelta(stageA.kpi.totalQuantity, stageB.kpi.totalQuantity)
+                }
+            };
+            res.json({
+                data: {
+                    stageA,
+                    stageB,
+                    delta,
+                    chart
+                }
+            });
+        }
+        finally {
+            client.release();
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post('/orders/target/options', async (req, res, next) => {
+    try {
+        const filter = salesTargetFilterSchema.parse(req.body ?? {});
+        const client = await getPool().connect();
+        try {
+            const sample = await client.query('SELECT * FROM l4k_model.joinsales_orderline LIMIT 0');
+            const fieldNames = sample.fields.map((f) => f.name);
+            const columns = resolveVsColumns(fieldNames);
+            const useCustomerTypeMap = await canUseCustomerTypeMap(client);
+            const data = await getSalesTargetOptions(client, filter, columns, useCustomerTypeMap);
+            res.json({ data });
+        }
+        finally {
+            client.release();
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+router.post('/orders/target/compare', async (req, res, next) => {
+    try {
+        const filter = salesTargetFilterSchema.parse(req.body ?? {});
+        const client = await getPool().connect();
+        try {
+            const sample = await client.query('SELECT * FROM l4k_model.joinsales_orderline LIMIT 0');
+            const fieldNames = sample.fields.map((f) => f.name);
+            const columns = resolveVsColumns(fieldNames);
+            const useCustomerTypeMap = await canUseCustomerTypeMap(client);
+            const data = await getSalesTargetCompare(client, filter, columns, useCustomerTypeMap);
+            res.json({ data });
+        }
+        finally {
+            client.release();
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Pivot data: monthly breakdown by channel > category for VS comparison
+const vsPivotSchema = vsStageFilterSchema.extend({
+    granularity: z.enum(['daily', 'monthly', 'yearly']).optional().default('monthly')
+});
+router.post('/orders/vs/pivot', async (req, res, next) => {
+    try {
+        const { granularity, ...stage } = vsPivotSchema.parse(req.body ?? {});
+        const client = await getPool().connect();
+        try {
+            const sample = await client.query('SELECT * FROM l4k_model.joinsales_orderline LIMIT 0');
+            const fieldNames = sample.fields.map((f) => f.name);
+            const columns = resolveVsColumns(fieldNames);
+            const useCtMap = await canUseCustomerTypeMap(client);
+            const dateCol = quoteIdent(columns.date);
+            const dateExpr = `j.${dateCol}`;
+            const params2 = [stage.dateStart, stage.dateEnd];
+            // Time grouping expression based on granularity
+            const timeExpr = granularity === 'daily'
+                ? `${dateExpr}::date`
+                : `EXTRACT(MONTH FROM ${dateExpr}::date)::int`;
+            const pivotSql = `
+        WITH scoped2 AS (
+          SELECT
+            ${timeExpr} AS time_key,
+            ${columns.order ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.order)} AS TEXT)), ''), j.ctid::text)` : 'j.ctid::text'} AS order_key,
+            ${columns.revenue ? `COALESCE(CAST(j.${quoteIdent(columns.revenue)} AS numeric), 0)` : '0::numeric'} AS revenue,
+            ${columns.quantity ? `COALESCE(CAST(j.${quoteIdent(columns.quantity)} AS numeric), 0)` : '0::numeric'} AS quantity,
+            ${columns.category ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.category)} AS TEXT)), ''), 'Unknown')` : "'Unknown'"} AS category,
+            ${useCtMap && columns.customer
+                ? `COALESCE(NULLIF(TRIM(ct.mapped_type), ''), 'Unknown')`
+                : "'Unknown'"} AS channel
+          FROM l4k_model.joinsales_orderline j
+          ${useCtMap && columns.customer
+                ? `LEFT JOIN (
+                SELECT TRIM(CAST("Title" AS TEXT)) AS title_key, MIN(CAST("type" AS TEXT)) AS mapped_type
+                FROM l4k_model.customer_type GROUP BY TRIM(CAST("Title" AS TEXT))
+              ) ct ON NULLIF(TRIM(CAST(j.${quoteIdent(columns.customer)} AS TEXT)), '') = ct.title_key`
+                : ''}
+          WHERE ${dateExpr}::date BETWEEN $1 AND $2
+          ${(() => {
+                const normalizedStatuses = normalizeVsStatuses(stage.statuses ?? []);
+                if (normalizedStatuses.length > 0) {
+                    const statusExpr = columns.status
+                        ? `CASE
+                    WHEN LOWER(TRIM(CAST(j.${quoteIdent(columns.status)} AS TEXT))) IN ('complete','completed','saled','fulfilled') THEN 'Complete'
+                    WHEN LOWER(TRIM(CAST(j.${quoteIdent(columns.status)} AS TEXT))) IN ('cancel','cancelled','canceled') THEN 'Cancel'
+                    ELSE 'Unknown'
+                  END`
+                        : "'Unknown'";
+                    params2.push(normalizedStatuses);
+                    return `AND ${statusExpr} = ANY($${params2.length}::text[])`;
+                }
+                return '';
+            })()}
+        ),
+        filtered2 AS (
+          SELECT * FROM scoped2
+          WHERE 1=1
+          ${(() => {
+                const channels = (stage.channels ?? []).map(v => v.trim().toLowerCase()).filter(Boolean);
+                const categories = (stage.categories ?? []).map(v => v.trim().toLowerCase()).filter(Boolean);
+                let extra = '';
+                if (channels.length > 0) {
+                    params2.push(channels);
+                    extra += ` AND LOWER(channel) = ANY($${params2.length}::text[])`;
+                }
+                if (categories.length > 0) {
+                    params2.push(categories);
+                    extra += ` AND LOWER(category) = ANY($${params2.length}::text[])`;
+                }
+                return extra;
+            })()}
+        )
+        SELECT
+          time_key,
+          channel,
+          category,
+          COUNT(DISTINCT order_key)::bigint AS orders,
+          COALESCE(SUM(revenue), 0)::numeric AS revenue,
+          COALESCE(SUM(quantity), 0)::numeric AS quantity
+        FROM filtered2
+        GROUP BY 1, 2, 3
+        ORDER BY 1, 2, 3`;
+            const result = await client.query(pivotSql, [stage.dateStart, stage.dateEnd, ...params2.slice(2)]);
+            // Build structured pivot: { months, channels, data }
+            const channelSet = new Set();
+            const categorySet = new Set();
+            const timeKeys = new Set();
+            const dataMap = new Map();
+            for (const row of result.rows) {
+                const tk = String(row.time_key);
+                const ch = String(row.channel ?? 'Unknown');
+                const cat = String(row.category ?? 'Unknown');
+                channelSet.add(ch);
+                categorySet.add(cat);
+                timeKeys.add(tk);
+                const key = `${tk}|${ch}|${cat}`;
+                dataMap.set(key, {
+                    orders: Number(row.orders ?? 0),
+                    revenue: Number(row.revenue ?? 0),
+                    quantity: Number(row.quantity ?? 0)
+                });
+            }
+            const channelsSorted = Array.from(channelSet).sort();
+            const categoriesSorted = Array.from(categorySet).sort();
+            // Build hierarchy: channel > category columns
+            const columnHeaders = [];
+            for (const ch of channelsSorted) {
+                for (const cat of categoriesSorted) {
+                    const hasData = Array.from(timeKeys).some((tk) => dataMap.has(`${tk}|${ch}|${cat}`));
+                    if (hasData)
+                        columnHeaders.push({ channel: ch, category: cat });
+                }
+            }
+            let months;
+            if (granularity === 'daily') {
+                // Sort dates, build rows for each date
+                const sortedDates = Array.from(timeKeys).sort();
+                months = sortedDates.map((dateStr, idx) => {
+                    // Format: "2025-03-07" -> "07/03/2025"
+                    const d = new Date(dateStr);
+                    const dd = String(d.getUTCDate()).padStart(2, '0');
+                    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const yyyy = d.getUTCFullYear();
+                    const dayLabel = `${dd}/${mm}/${yyyy}`;
+                    const cells = columnHeaders.map((col) => {
+                        const v = dataMap.get(`${dateStr}|${col.channel}|${col.category}`);
+                        return { orders: v?.orders ?? 0, revenue: v?.revenue ?? 0, quantity: v?.quantity ?? 0 };
+                    });
+                    return { monthIndex: idx + 1, label: dayLabel, cells };
+                });
+            }
+            else {
+                // Monthly: fixed 12 rows
+                const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                months = Array.from({ length: 12 }, (_, i) => {
+                    const idx = i + 1;
+                    const cells = columnHeaders.map((col) => {
+                        const d = dataMap.get(`${idx}|${col.channel}|${col.category}`);
+                        return { orders: d?.orders ?? 0, revenue: d?.revenue ?? 0, quantity: d?.quantity ?? 0 };
+                    });
+                    return { monthIndex: idx, label: MONTH_LABELS[i], cells };
+                });
+            }
+            res.json({
+                data: {
+                    columnHeaders,
+                    months
+                }
+            });
         }
         finally {
             client.release();

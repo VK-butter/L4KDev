@@ -19,7 +19,3 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-export const healthApi = {
-  ping: () => apiClient.get('/health')
-};

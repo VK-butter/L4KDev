@@ -1,5 +1,157 @@
 [
   {
+    "id": "fe28877d-940e-4b6f-a3dc-fa7d943ab4fd",
+    "timestamp": "2026-03-07T04:06:24.179Z",
+    "actorId": "user-admin-001",
+    "action": "reactivate",
+    "targetUserId": "c4931482-d30b-4344-b8d8-f3b84b6ad74e",
+    "details": "Reactivated user"
+  },
+  {
+    "id": "386a00e9-2eff-4a8e-b742-b0b497b50652",
+    "timestamp": "2026-03-07T04:06:22.439Z",
+    "actorId": "user-admin-001",
+    "action": "deactivate",
+    "targetUserId": "c4931482-d30b-4344-b8d8-f3b84b6ad74e",
+    "details": "Deactivated user"
+  },
+  {
+    "id": "aeef8ac6-21a9-4d6e-84a0-9c232bfee1d2",
+    "timestamp": "2026-03-07T04:06:17.076Z",
+    "actorId": "user-admin-001",
+    "action": "reactivate",
+    "targetUserId": "c4931482-d30b-4344-b8d8-f3b84b6ad74e",
+    "details": "Reactivated user"
+  },
+  {
+    "id": "b5caa27e-8082-42f5-92e7-55ff406def64",
+    "timestamp": "2026-03-07T04:06:14.414Z",
+    "actorId": "user-admin-001",
+    "action": "deactivate",
+    "targetUserId": "c4931482-d30b-4344-b8d8-f3b84b6ad74e",
+    "details": "Deactivated user"
+  },
+  {
+    "id": "330f055c-ef05-4495-bd72-f15de7e76f90",
+    "timestamp": "2026-03-06T08:25:12.499Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "49215641-53bb-4ce1-bfeb-6cfb7275c49e",
+    "details": "Deleted user autotest+1762771132719@example.com"
+  },
+  {
+    "id": "ffa116f5-aa58-4aa6-9395-8f5feb3d813e",
+    "timestamp": "2026-03-06T08:25:10.115Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "869ba32d-cdbb-4e3b-9648-f652b53fd641",
+    "details": "Deleted user autotest+1762773618413@example.com"
+  },
+  {
+    "id": "2853ad55-7996-4034-a5b6-356f1879194c",
+    "timestamp": "2026-03-06T08:25:09.359Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "0d2f6d4c-2d03-444e-8bb1-19971f8ef88b",
+    "details": "Deleted user autotest+1762773900999@example.com"
+  },
+  {
+    "id": "f89fb38d-bd16-4609-8cb9-fd240688327a",
+    "timestamp": "2026-03-06T08:25:08.958Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "08bd5708-1f1b-4786-a542-0e50f649282b",
+    "details": "Deleted user autotest+1762773953858@example.com"
+  },
+  {
+    "id": "5840f1c8-7c32-4cdd-8620-c1d778b48de8",
+    "timestamp": "2026-03-06T08:25:08.616Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "bd4ab95e-dd1f-4ccc-b8b0-b24da74ddf08",
+    "details": "Deleted user autotest+1762774835243@example.com"
+  },
+  {
+    "id": "2db204a1-354a-4797-98a9-e335c49d429d",
+    "timestamp": "2026-03-06T08:25:08.184Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "dd329f41-11c1-441e-9a31-81cc3dc63c35",
+    "details": "Deleted user autotest+1762774864980@example.com"
+  },
+  {
+    "id": "170f3099-9665-473e-87ff-544c210fa0e4",
+    "timestamp": "2026-03-06T08:25:07.823Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "fd63efc3-df06-4eb5-b97c-2d9a819c27f0",
+    "details": "Deleted user autotest+1762774986755@example.com"
+  },
+  {
+    "id": "50b93054-f0bf-4c9b-bff5-3ea1285edc82",
+    "timestamp": "2026-03-06T08:25:07.476Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "01d5580b-ffb3-4401-825a-7e6da7032654",
+    "details": "Deleted user autotest+1762775979687@example.com"
+  },
+  {
+    "id": "b13c4647-baf5-4f26-bba0-c84b66bcb523",
+    "timestamp": "2026-03-06T08:25:07.045Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "8ef1b492-e4bb-487b-a2a2-0d47ba36b63d",
+    "details": "Deleted user autotest+1762835901064@example.com"
+  },
+  {
+    "id": "ec4812c1-a930-4045-89e9-153947f0fc0e",
+    "timestamp": "2026-03-06T08:25:06.546Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "1c4192c8-1ac5-48b9-90ac-e35fe240ac10",
+    "details": "Deleted user autotest+1762836004360@example.com"
+  },
+  {
+    "id": "addf2576-4dfe-41eb-9cef-16706f8e89c7",
+    "timestamp": "2026-03-06T08:25:05.748Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "55892cd7-88a4-4d6b-896b-b8afb21ef055",
+    "details": "Deleted user autotest+1762836054008@example.com"
+  },
+  {
+    "id": "ab2aff4f-0d55-4501-82a2-1082f8b8b82a",
+    "timestamp": "2026-03-06T08:25:05.071Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "064378ec-073f-4e97-b9a4-be702ab1c199",
+    "details": "Deleted user autotest+1762836123513@example.com"
+  },
+  {
+    "id": "c1a5bc0f-8d58-488c-ba21-da3a986d914f",
+    "timestamp": "2026-03-06T08:25:04.433Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "baef6283-b195-4f17-a25e-0d4934c94dfb",
+    "details": "Deleted user autotest+1762836171040@example.com"
+  },
+  {
+    "id": "ade55841-8baa-42eb-a1de-34bb22904dbe",
+    "timestamp": "2026-03-06T08:25:02.583Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "f99c047a-58b8-4f91-9f0c-83153c2df369",
+    "details": "Deleted user autotest+1762836229621@example.com"
+  },
+  {
+    "id": "8133c937-7751-4dd3-a78b-2cce95cfb9a4",
+    "timestamp": "2026-03-06T08:25:02.076Z",
+    "actorId": "user-admin-001",
+    "action": "delete",
+    "targetUserId": "263fdbca-6a33-4637-9112-b350e52f953c",
+    "details": "Deleted user autotest+1762836275877@example.com"
+  },
+  {
     "id": "f05a4677-1bfe-4853-afb6-f2fedc99a918",
     "timestamp": "2025-11-26T02:14:41.379Z",
     "actorId": "user-admin-001",

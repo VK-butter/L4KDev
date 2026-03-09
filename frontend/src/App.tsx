@@ -4,9 +4,10 @@ import { AppShell } from './components/layout/AppShell';
 import { SessionProvider, useSession } from './hooks/useSession';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
-import { DashboardHome } from './pages/DashboardHome';
 import { SalesOrderAnalysis } from './pages/SalesOrderAnalysis';
 import { ProductSkuDashboard } from './pages/ProductSkuDashboard';
+import { SalesByChannelPage } from './pages/SalesByChannelPage';
+import { SalesVsTargetPage } from './pages/SalesVsTargetPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { NocoDbMasterPage } from './pages/NocoDbMasterPage';
 import { UserManagementPanel } from './components/admin/UserManagementPanel';
@@ -19,8 +20,10 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<ProtectedAppLayout />}>
-              <Route path="/" element={<DashboardHome />} />
+              <Route path="/" element={<Navigate to="/dashboards/sales" replace />} />
               <Route path="/dashboards/sales" element={<SalesOrderAnalysis />} />
+              <Route path="/dashboards/sales-by-channel" element={<SalesByChannelPage />} />
+              <Route path="/dashboards/sales-vs-target" element={<SalesVsTargetPage />} />
               <Route path="/dashboards/product-sku" element={<ProductSkuDashboard />} />
               <Route path="/integrations" element={<IntegrationsPage />} />
               <Route path="/nocodb" element={<NocoDbMasterPage />} />

@@ -7,3 +7,5 @@ deployment/.env
 deployment/env/backend.env
 frontend/test-results/
 frontend/dist/
+backend/dist/
+shared/dist/

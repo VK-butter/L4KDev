@@ -1,21 +1,12 @@
 import type { AnalyticsCategoryBreakdown } from '@shared/index';
 import {
-  Bar,
-  BarChart,
-  Cell,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
+  Bar, BarChart, Cell, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis
 } from 'recharts';
 import { NoDataState } from './NoDataState';
 import { useCallback } from 'react';
 
 type BarClickPayload = {
-  payload?: {
-    category?: string;
-  };
+  payload?: { category?: string };
   category?: string;
 };
 
@@ -26,12 +17,9 @@ interface Props {
   onSelectCategory?: (category: string | null) => void;
 }
 
-export function RevenueByCategoryChart({
-  data,
-  loading,
-  selectedCategory,
-  onSelectCategory
-}: Props) {
+const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+export function RevenueByCategoryChart({ data, loading, selectedCategory, onSelectCategory }: Props) {
   const handleContainerClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       const target = event.target as Element | null;
@@ -44,65 +32,80 @@ export function RevenueByCategoryChart({
     },
     [onSelectCategory, selectedCategory]
   );
+
   if (!loading && data.length === 0) {
     return <NoDataState message="No category data for this filter range." />;
   }
 
   return (
     <div
-      className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"
+      className="panel flex flex-col gap-4"
       data-testid="category-chart"
       role="region"
       aria-label="Revenue by Category chart"
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-emerald-900">
-          Revenue by Category
-        </p>
+        <div>
+          <p className="section-heading">Analytics</p>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-emerald-100">
+            Revenue by Category
+          </h3>
+        </div>
         {selectedCategory && (
           <button
             type="button"
-            className="text-xs font-semibold uppercase tracking-widest text-emerald-500"
+            className="btn-sm btn-ghost text-xs"
             onClick={() => onSelectCategory?.(null)}
           >
-            Clear drill-down
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+            Clear
           </button>
         )}
       </div>
+
       <div
-        className="mt-4 h-72"
+        className="h-64"
         data-testid="category-chart-visual"
         onClick={handleContainerClick}
       >
         {loading ? (
-          <div className="flex h-full items-center justify-center text-emerald-400">
-            Loading…
+          <div className="flex h-full flex-col gap-3 justify-end pb-2">
+            {[60, 90, 45, 75, 55, 80].map((h, i) => (
+              <div key={i} className="skeleton" style={{ height: `${h}%` }} />
+            ))}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="category" />
-              <YAxis />
-              <Tooltip
-                formatter={(value: number) =>
-                  new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    maximumFractionDigits: 0
-                  }).format(value)
-                }
+            <BarChart data={data} margin={{ left: 0, right: 4, top: 4, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(16,185,129,0.1)" vertical={false} />
+              <XAxis
+                dataKey="category"
+                tick={{ fontSize: 11, fill: '#6b7280' }}
+                axisLine={false}
+                tickLine={false}
               />
-              <Bar
-                dataKey="revenue"
-                fill="#10b981"
-                cursor="pointer"
+              <YAxis
+                tick={{ fontSize: 11, fill: '#6b7280' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: '1px solid rgba(16,185,129,0.2)',
+                  boxShadow: '0 10px 25px -10px rgba(0,0,0,0.15)',
+                  fontSize: '13px'
+                }}
+                formatter={(value: number) => [fmt.format(value), 'Revenue']}
+              />
+              <Bar dataKey="revenue" radius={[6, 6, 0, 0]} cursor="pointer"
                 onClick={(dataPoint: BarClickPayload) => {
                   const category = dataPoint?.payload?.category ?? dataPoint?.category;
                   if (typeof category === 'string' && category.length > 0) {
-                    onSelectCategory?.(
-                      category === selectedCategory ? null : category
-                    );
+                    onSelectCategory?.(category === selectedCategory ? null : category);
                   }
                 }}
               >
@@ -110,26 +113,11 @@ export function RevenueByCategoryChart({
                   <Cell
                     key={entry.category}
                     data-category={entry.category}
-                    fill={
-                      entry.category === selectedCategory
-                        ? '#047857'
-                        : '#34d399'
-                    }
+                    fill={entry.category === selectedCategory ? '#059669' : '#34d399'}
+                    opacity={selectedCategory && entry.category !== selectedCategory ? 0.45 : 1}
                     style={{ cursor: 'pointer' }}
-                    onClick={() =>
-                      onSelectCategory?.(
-                        entry.category === selectedCategory
-                          ? null
-                          : entry.category
-                      )
-                    }
-                    onMouseDown={() =>
-                      onSelectCategory?.(
-                        entry.category === selectedCategory
-                          ? null
-                          : entry.category
-                      )
-                    }
+                    onClick={() => onSelectCategory?.(entry.category === selectedCategory ? null : entry.category)}
+                    onMouseDown={() => onSelectCategory?.(entry.category === selectedCategory ? null : entry.category)}
                   />
                 ))}
               </Bar>
@@ -137,6 +125,12 @@ export function RevenueByCategoryChart({
           </ResponsiveContainer>
         )}
       </div>
+
+      {selectedCategory && (
+        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+          Filtered to: <strong>{selectedCategory}</strong>
+        </p>
+      )}
     </div>
   );
 }

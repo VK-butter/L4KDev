@@ -1,2 +1,15 @@
-model = "gpt-5.1-codex-max"
+model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
+personality = "pragmatic"
+
+[mcp_servers.n8n]
+args = ["-y", "@leonardsellem/n8n-mcp-server@latest"]
+command = "npx"
+
+[mcp_servers.n8n.env]
+N8N_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5MjU0MTQxZC1iMzBiLTRmNzktYjhlNy03NGZmZGMwYTQwNDQiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY5NjY5OTk2fQ.8DFghi0kqz7UKQrhPZcwOpXguxTy4xBYGwcCqNMFhKs"
+N8N_API_URL = "http://10.1.27.28:5678/api/v1"
+
+[mcp_servers.playwright]
+args = ["@playwright/mcp@latest"]
+command = "npx"

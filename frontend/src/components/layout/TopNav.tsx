@@ -1,14 +1,7 @@
 import { brandPalette, elevation } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 import type { SessionUser } from '../../hooks/useSession';
-import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-
-const navLinks = [
-  { label: 'Overview', href: '/' },
-  { label: 'Sales', href: '/' },
-  { label: 'Integrations', href: '/integrations' }
-];
 
 interface TopNavProps {
   user?: SessionUser | null;
@@ -18,109 +11,136 @@ interface TopNavProps {
 }
 
 export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavProps) {
-  const location = useLocation();
   const [logoError, setLogoError] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const logoUrl = import.meta.env.VITE_BRAND_LOGO_URL ?? '/brand/logo.png';
+
+  const initials = user?.displayName
+    ? user.displayName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+    : 'SD';
+
   return (
     <header
-      className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-100/70 bg-white/90 px-8 py-4 backdrop-blur transition-colors duration-200 dark:border-white/10 dark:bg-surface-cardDark/80"
+      className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-emerald-100/60 bg-white/95 px-4 backdrop-blur-md transition-colors duration-200 dark:border-white/[0.07] dark:bg-[#0a1c12]/95"
       style={{ boxShadow: elevation.nav }}
       role="banner"
       aria-label="Application header"
     >
-      <div className="flex items-center gap-4">
+      {/* Left: hamburger + brand */}
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="mr-1 inline-flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-lg border border-emerald-100 bg-white text-emerald-700 shadow-sm transition-colors duration-200 hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-800 dark:bg-surface-cardDark dark:text-surface-textOnSurface"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-600 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
           aria-label="Toggle sidebar"
         >
-          {/* simple hamburger icon */}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <line x1="3" y1="6" x2="21" y2="6" />
             <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        {(!logoError && logoUrl) ? (
-          <img
-            src={logoUrl}
-            alt="Learning for Kidz logo"
-            className="h-12 w-12 md:h-14 md:w-14 rounded-2xl object-contain bg-white border border-emerald-100"
-            onError={() => setLogoError(true)}
-          />
-        ) : (
-          <span
-            className="flex h-12 w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl text-white font-bold"
-            style={{ backgroundColor: brandPalette.brand[600] }}
-          >
-            SD
-          </span>
-        )}
-        <div>
-          <p className="text-sm uppercase tracking-widest text-emerald-500">
-            Sale Dashboard
-          </p>
-          <p className="text-lg font-semibold text-emerald-900">
-            Learning for Kidz
-          </p>
+
+        <div className="flex items-center gap-2.5">
+          {(!logoError && logoUrl) ? (
+            <img
+              src={logoUrl}
+              alt="Brand logo"
+              className="h-9 w-9 rounded-xl object-contain bg-white border border-emerald-100 dark:border-white/10"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white"
+              style={{ backgroundColor: brandPalette.brand[600] }}
+            >
+              SD
+            </span>
+          )}
+          <div className="hidden sm:block leading-none">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-500 dark:text-emerald-400">
+              Sales Dashboard
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-emerald-100">
+              Learning for Kidz
+            </p>
+          </div>
         </div>
       </div>
 
-      <nav className="hidden items-center gap-6 text-sm font-medium text-emerald-900 md:flex" aria-label="Primary">
-        {navLinks.map((link) => {
-          const active = location.pathname === link.href;
-          return (
-            <Link
-              key={link.label}
-              to={link.href}
-              className={`transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 focus-visible:rounded ${
-                active
-                  ? 'text-emerald-600 dark:text-emerald-300'
-                  : 'hover:text-emerald-500 dark:text-surface-textOnSurface dark:hover:text-emerald-200'
-              }`}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="flex items-center gap-3 md:gap-4">
+      {/* Right: actions */}
+      <div className="flex items-center gap-2">
+        {/* Theme toggle */}
         <button
           type="button"
           onClick={toggleTheme}
           aria-pressed={theme === 'dark'}
-          className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-widest text-emerald-700 shadow-sm transition-colors duration-200 hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-800 dark:bg-surface-cardDark dark:text-surface-textOnSurface dark:hover:border-emerald-500"
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-600 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
         >
-          <span aria-hidden>{theme === 'dark' ? '☀️' : '🌙'}</span>
-          <span className="hidden md:inline">{theme === 'dark' ? 'Light' : 'Dark'} mode</span>
+          {theme === 'dark' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          )}
         </button>
-        <div className="hidden text-right text-sm font-medium text-emerald-900 dark:text-surface-textOnSurface md:block">
-          <p>{user?.displayName ?? 'Guest'}</p>
-          <p className="text-emerald-500 text-xs uppercase tracking-widest dark:text-emerald-300">
-            {user?.role ?? 'role'}
-          </p>
-        </div>
+
+        {/* Admin button */}
         {user?.role === 'admin' && (
           <button
             type="button"
             onClick={onAdminMenu}
             data-testid="admin-menu-button"
-            className="rounded-full border border-emerald-100 bg-white px-4 py-1 text-sm font-medium text-emerald-700 shadow-sm transition hover:border-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-800 dark:bg-surface-cardDark dark:text-surface-textOnSurface dark:hover:border-emerald-500"
+            className="btn-sm btn-outline hidden sm:inline-flex"
             aria-label="Open admin menu"
           >
-            Admin Menu
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <span>Admin</span>
           </button>
         )}
+
+        {/* User info */}
+        <div className="hidden items-center gap-2.5 border-l border-emerald-100 pl-3 dark:border-white/10 md:flex">
+          <div className="text-right leading-none">
+            <p className="text-sm font-semibold text-gray-900 dark:text-emerald-100">
+              {user?.displayName ?? 'Guest'}
+            </p>
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-500 dark:text-emerald-400">
+              {user?.role ?? ''}
+            </p>
+          </div>
+          <div
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+            style={{ backgroundColor: brandPalette.brand[600] }}
+            aria-hidden
+          >
+            {initials}
+          </div>
+        </div>
+
+        {/* Logout */}
         <button
           type="button"
           onClick={onLogout}
-          className="rounded-lg border border-emerald-200 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-emerald-700 transition hover:border-emerald-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:border-emerald-700 dark:text-surface-textOnSurface dark:hover:border-emerald-500"
+          className="btn-sm btn-ghost"
           aria-label="Sign out"
         >
-          Logout
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          <span className="hidden sm:inline">Logout</span>
         </button>
       </div>
     </header>

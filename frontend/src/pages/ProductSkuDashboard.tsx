@@ -26,6 +26,46 @@ function normalizeError(err: unknown) {
   return 'Something went wrong';
 }
 
+/* ── SVG Icons ──────────────────────────────────── */
+const QtyIcon = <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>;
+const AmountIcon = <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+
+/* ── Animated number counter ────────────────────── */
+function AnimatedNum({ value, prefix = '', suffix = '' }: { value: number; prefix?: string; suffix?: string }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    const dur = 600;
+    const start = performance.now();
+    const from = display;
+    function tick(now: number) {
+      const t = Math.min((now - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (value - from) * ease));
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }, [value]);
+  return <>{prefix}{display.toLocaleString()}{suffix}</>;
+}
+
+/* ── KPI metric mini-card ───────────────────────── */
+function MetricBox({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-200 hover:scale-[1.02]
+      border-emerald-100 bg-white dark:border-white/[0.06] dark:bg-white/[0.03]">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-emerald-500">{label}</p>
+        <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+          <AnimatedNum value={value} />
+        </p>
+      </div>
+    </div>
+  );
+}
+
 type SkuTableProps = {
   title: string;
   caption: string;
@@ -53,57 +93,50 @@ function SkuRawTable({
     <section className="panel">
       <header className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-widest text-emerald-500">{caption}</p>
-          <h3 className="text-lg font-semibold text-emerald-900">{title}</h3>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">{caption}</p>
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h3>
         </div>
         {onExport && (
           <button
             type="button"
             onClick={onExport}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:border-emerald-400 disabled:opacity-60"
-            title="Export all filtered rows to Excel"
+            className="btn-sm btn-outline disabled:opacity-40"
+            title="Export all filtered rows to CSV"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <circle cx="12" cy="12" r="11" fill="#1f9d55" />
-              <rect x="7" y="6" width="10" height="12" rx="1.5" fill="#ffffff" />
-              <path d="M9.5 9.5L12 12l-2.5 2.5M14.5 9.5L12 12l2.5 2.5" stroke="#1f9d55" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Export</span>
+            Export
           </button>
         )}
       </header>
-      {loading && <p className="text-emerald-500">Loading…</p>}
+
+      {loading && (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-9 w-full" />)}
+        </div>
+      )}
       {!loading && data && data.rows.length === 0 && (
-        <p className="text-emerald-700">No rows found for this dataset.</p>
+        <p className="py-4 text-center text-sm text-gray-400 dark:text-emerald-600">No rows found for this dataset.</p>
       )}
       {!loading && data && data.rows.length > 0 && (
         <>
-          <div className="overflow-auto max-h-96 rounded border border-emerald-100">
-            <table className="min-w-full border-collapse text-sm">
+          <div className="overflow-auto max-h-96 rounded-xl border border-emerald-100 dark:border-white/[0.06]">
+            <table className="tbl">
               <thead>
                 <tr>
-                  <th className="sticky top-0 bg-emerald-50 border-b border-emerald-200 px-2 py-1 text-left text-emerald-800 w-12">
-                    #
-                  </th>
+                  <th className="w-12">#</th>
                   {data.columns.map((c) => (
-                    <th
-                      key={c}
-                      className="sticky top-0 bg-emerald-50 border-b border-emerald-200 px-2 py-1 text-left text-emerald-800"
-                    >
-                      {c}
-                    </th>
+                    <th key={c}>{c}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((row, i) => (
-                  <tr key={i} className="border-b border-emerald-50">
-                    <td className="px-2 py-2 whitespace-nowrap text-emerald-700">
+                  <tr key={i}>
+                    <td className="text-gray-400 dark:text-emerald-600 tabular-nums">
                       {(((data.page - 1) * data.pageSize) + i + 1).toLocaleString()}
                     </td>
                     {data.columns.map((c) => (
-                      <td key={c} className="px-2 py-2 whitespace-nowrap text-emerald-900">
+                      <td key={c} className="whitespace-nowrap">
                         {String((row as Record<string, unknown>)[c] ?? '')}
                       </td>
                     ))}
@@ -112,7 +145,8 @@ function SkuRawTable({
               </tbody>
             </table>
           </div>
-          <footer className="mt-3 flex items-center justify-between text-sm text-emerald-700">
+
+          <footer className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-emerald-400">
             <div>
               {data.totalRecords > 0 ? (
                 <span>
@@ -123,11 +157,11 @@ function SkuRawTable({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-emerald-700">Per page</label>
+              <label className="text-gray-500 dark:text-emerald-400">Per page</label>
               <select
                 value={pageSize}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="rounded border border-emerald-200 px-2 py-1"
+                className="input w-auto py-1.5 px-2"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
@@ -138,18 +172,18 @@ function SkuRawTable({
                 type="button"
                 disabled={loading || (data?.page ?? 1) <= 1}
                 onClick={() => onPageChange(Math.max(page - 1, 1))}
-                className="rounded border border-emerald-200 px-3 py-1 disabled:opacity-50"
+                className="btn-sm btn-outline disabled:opacity-40"
               >
                 Prev
               </button>
-              <span>
+              <span className="text-gray-600 dark:text-emerald-300">
                 Page {data?.page ?? page} / {data?.totalPages ?? '-'}
               </span>
               <button
                 type="button"
                 disabled={loading || (data?.page ?? 1) >= (data?.totalPages ?? 1)}
                 onClick={() => onPageChange(data ? Math.min(page + 1, data.totalPages) : page + 1)}
-                className="rounded border border-emerald-200 px-3 py-1 disabled:opacity-50"
+                className="btn-sm btn-outline disabled:opacity-40"
               >
                 Next
               </button>
@@ -300,90 +334,90 @@ export function ProductSkuDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-6" data-testid="product-sku-dashboard">
-      <header className="flex items-end justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-emerald-500">Dashboards</p>
-          <h1 className="text-2xl font-semibold text-emerald-900">Product SKU</h1>
-          <p className="text-sm text-emerald-700">
-            Current vs previous year SKU quantities sourced from l4k_model tables.
-          </p>
-        </div>
+    <div className="flex flex-col gap-5" data-testid="product-sku-dashboard">
+      {/* ── Header ──────────────────────────────── */}
+      <header>
+        <p className="section-heading">Dashboards</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Product SKU</h1>
+        <p className="text-sm text-gray-500 dark:text-emerald-400">
+          เปรียบเทียบจำนวน SKU ปีปัจจุบันกับปีก่อนหน้า
+        </p>
       </header>
 
+      {/* ── KPI Cards ────────────────────────────── */}
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MetricBox label="Current Qty" value={currentTotal} icon={QtyIcon}
+          color="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300" />
+        <MetricBox label="Previous Qty" value={previousTotal} icon={QtyIcon}
+          color="bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300" />
+        <MetricBox label="Current Amount" value={currentAmountTotal} icon={AmountIcon}
+          color="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300" />
+        <MetricBox label="Previous Amount" value={previousAmountTotal} icon={AmountIcon}
+          color="bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300" />
+      </section>
+
+      {/* ── Chart ────────────────────────────────── */}
       <section className="panel">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-emerald-500">Monthly trend</p>
-            <h3 className="text-lg font-semibold text-emerald-900">Current vs Previous Year</h3>
+        <div className="mb-3 flex items-center justify-between gap-4 flex-wrap">
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Monthly Trend</h3>
+          <div className="flex gap-1">
+            {(['qty', 'amount'] as const).map((m) => {
+              const isActive = chartMetric === m;
+              return (
+                <button key={m} type="button" onClick={() => setChartMetric(m)}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-all duration-150
+                    ${isActive
+                      ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25'
+                      : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300'
+                    }`}>
+                  {m === 'qty' ? 'จำนวน (Qty)' : 'ยอดรวม (Price)'}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex gap-2 text-sm">
-            <button
-              type="button"
-              onClick={() => setChartMetric('qty')}
-              className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                chartMetric === 'qty'
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                  : 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400'
-              }`}
-            >
-              จำนวน (Qty)
-            </button>
-            <button
-              type="button"
-              onClick={() => setChartMetric('amount')}
-              className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                chartMetric === 'amount'
-                  ? 'border-blue-500 bg-blue-50 text-blue-900'
-                  : 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400'
-              }`}
-            >
-              ยอดรวม (Price)
-            </button>
-          </div>
-          {chartMetric === 'qty' && (
-            <div className="flex gap-3 text-sm text-emerald-800">
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                <p className="text-xs uppercase tracking-widest text-emerald-600">Current qty</p>
-                <p className="text-lg font-semibold text-emerald-900">
-                  {currentTotal.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-                <p className="text-xs uppercase tracking-widest text-blue-600">Previous qty</p>
-                <p className="text-lg font-semibold text-blue-900">
-                  {previousTotal.toLocaleString()}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
-        <div className="mt-4">
-          {chartLoading && <p className="text-emerald-500">Loading chart…</p>}
-        {chartError && <p className="text-rose-600">{chartError}</p>}
+
+        {chartLoading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => <div key={i} className="skeleton h-9 w-full" />)}
+          </div>
+        )}
+        {chartError && <p className="text-sm text-rose-600 dark:text-rose-400">{chartError}</p>}
         {!chartLoading && !chartError && chartData.length === 0 && !amountTotals && (
-          <p className="text-emerald-700">No monthly totals detected in the SKU tables.</p>
+          <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-emerald-200 dark:border-white/10">
+            <p className="text-sm text-gray-400 dark:text-emerald-600">No monthly totals detected in the SKU tables.</p>
+          </div>
         )}
         {!chartLoading && !chartError && (chartData.length > 0 || amountTotals) && (
           chartMetric === 'amount' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-xs uppercase tracking-widest text-emerald-600">ยอดรวมปีปัจจุบัน</p>
-                <p className="mt-2 text-3xl font-semibold text-emerald-900">
-                  {currentAmountTotal.toLocaleString()}
-                </p>
-                <p className="text-sm text-emerald-700">จากข้อมูล SKU_dataCurrent</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center gap-3 rounded-xl border px-4 py-4 border-emerald-100 bg-white dark:border-white/[0.06] dark:bg-white/[0.03]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300">
+                  {AmountIcon}
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-emerald-500">ยอดรวมปีปัจจุบัน</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                    {currentAmountTotal.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-emerald-600">SKU_dataCurrent</p>
+                </div>
               </div>
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-xs uppercase tracking-widest text-blue-600">ยอดรวมปีก่อน</p>
-                <p className="mt-2 text-3xl font-semibold text-blue-900">
-                  {previousAmountTotal.toLocaleString()}
-                </p>
-                <p className="text-sm text-blue-700">จากข้อมูล SKU_dataPrevious</p>
+              <div className="flex items-center gap-3 rounded-xl border px-4 py-4 border-emerald-100 bg-white dark:border-white/[0.06] dark:bg-white/[0.03]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300">
+                  {AmountIcon}
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-emerald-500">ยอดรวมปีก่อน</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                    {previousAmountTotal.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-emerald-600">SKU_dataPrevious</p>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="h-80">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ left: 8, right: 16 }}>
                   <defs>
@@ -396,14 +430,15 @@ export function ProductSkuDashboard() {
                       <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2f3eb" />
-                  <XAxis dataKey="monthLabel" />
-                  <YAxis allowDecimals={false} />
+                  <CartesianGrid vertical={false} stroke="rgba(16,185,129,0.08)" />
+                  <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    formatter={(value: number) => value.toLocaleString()}
+                    contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13 }}
+                    formatter={(value: number) => [value.toLocaleString()]}
                     labelFormatter={(label) => `Month: ${label}`}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Area
                     type="monotone"
                     dataKey="currentQty"
@@ -427,14 +462,14 @@ export function ProductSkuDashboard() {
             </div>
           )
         )}
-        </div>
       </section>
 
-      <section className="panel">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-emerald-500">Search</p>
-            <h3 className="text-lg font-semibold text-emerald-900">Filter SKU rows</h3>
+      {/* ── Search / Filter ──────────────────────── */}
+      <section className="panel border-l-4 border-emerald-400 dark:border-emerald-600">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Search</h3>
           </div>
           <input
             type="text"
@@ -445,13 +480,14 @@ export function ProductSkuDashboard() {
               setPreviousPage(1);
             }}
             placeholder="Search SKU, product, description…"
-            className="w-64 rounded-lg border border-emerald-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+            className="input w-64"
           />
         </div>
-        {tableError && <p className="mt-3 text-rose-600">{tableError}</p>}
+        {tableError && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{tableError}</p>}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* ── Data Tables ──────────────────────────── */}
+      <div className="grid gap-5 lg:grid-cols-2">
         <SkuRawTable
           title="Current year (SKU_dataCurrent)"
           caption="Raw table preview"

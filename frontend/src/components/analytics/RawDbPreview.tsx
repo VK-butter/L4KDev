@@ -22,61 +22,73 @@ export function RawDbPreview() {
       }
     }
     load();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [page]);
 
   return (
-    <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
-      <header className="mb-4 flex items-center justify-between">
+    <section className="panel">
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-widest text-emerald-500">DB Preview</p>
-          <h3 className="text-xl font-semibold text-emerald-900">l4k_model.joinsales_orderline</h3>
+          <p className="section-heading">Live Database</p>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-emerald-100">
+            joinsales_orderline
+          </h3>
         </div>
-        <div className="flex items-center gap-2 text-sm text-emerald-700">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={loading || (data?.page ?? 1) <= 1}
             onClick={() => setPage((p) => Math.max(p - 1, 1))}
-            className="rounded border border-emerald-200 px-2 py-1 disabled:opacity-50"
+            className="btn-sm btn-outline disabled:opacity-40"
           >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
             Prev
           </button>
-          <span>
-            Page {data?.page ?? page} / {data?.totalPages ?? '-'}
+          <span className="text-xs text-gray-500 dark:text-emerald-500">
+            {data?.page ?? page} / {data?.totalPages ?? '—'}
           </span>
           <button
             type="button"
             disabled={loading || (data?.page ?? 1) >= (data?.totalPages ?? 1)}
             onClick={() => setPage((p) => (data ? Math.min(p + 1, data.totalPages) : p + 1))}
-            className="rounded border border-emerald-200 px-2 py-1 disabled:opacity-50"
+            className="btn-sm btn-outline disabled:opacity-40"
           >
             Next
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         </div>
       </header>
-      {loading && <p className="text-emerald-500">Loading…</p>}
-      {error && <p className="text-rose-600">{error}</p>}
+
+      {loading && (
+        <div className="space-y-2">
+          {[1,2,3,4,5].map((i) => <div key={i} className="skeleton h-9 w-full" />)}
+        </div>
+      )}
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+          <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          {error}
+        </div>
+      )}
       {!loading && !error && data && (
-        <div className="overflow-auto">
-          <table className="min-w-full border-collapse text-sm">
+        <div className="overflow-auto rounded-xl border border-emerald-100 dark:border-white/[0.06]">
+          <table className="tbl">
             <thead>
               <tr>
-                {data.columns.map((c) => (
-                  <th key={c} className="sticky top-0 bg-emerald-50 border-b border-emerald-200 px-2 py-1 text-left text-emerald-800">
-                    {c}
-                  </th>
-                ))}
+                {data.columns.map((c) => <th key={c}>{c}</th>)}
               </tr>
             </thead>
             <tbody>
               {data.rows.map((row, i) => (
-                <tr key={i} className="border-b border-emerald-50">
+                <tr key={i}>
                   {data.columns.map((c) => (
-                    <td key={c} className="px-2 py-1 text-emerald-900">
-                      {String(row[c] ?? '')}
-                    </td>
+                    <td key={c} className="whitespace-nowrap">{String(row[c] ?? '')}</td>
                   ))}
                 </tr>
               ))}

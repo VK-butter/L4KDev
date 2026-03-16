@@ -740,7 +740,7 @@ function buildSalesTargetTargetScopedQuery(
   includeDimensionFilters: boolean
 ) {
   const params: Array<string | string[]> = [filter.dateStart, filter.dateEnd];
-  const monthExpr = `date_trunc('month', ((t.target_month + interval '7 hour')::date))::date`;
+  const monthExpr = `to_date(t.month, 'MM_YYYY')`;
   const rawChannelExpr = `COALESCE(NULLIF(TRIM(CAST(t.channel AS TEXT)), ''), 'Unknown')`;
   const channelExpr = salesTargetChannelSql(rawChannelExpr);
   const categoryExpr = `COALESCE(NULLIF(TRIM(CAST(t.category AS TEXT)), ''), 'Unknown')`;

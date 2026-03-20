@@ -16,6 +16,8 @@ import {
   type SkuPeriod
 } from '../services/skuApi';
 import { downloadCsv } from '../utils/downloadCsv';
+import { NoDataState } from '../components/analytics/NoDataState';
+import { Pagination } from '../components/common/Pagination';
 
 type ApiError = { response?: { data?: { error?: unknown } } };
 
@@ -94,7 +96,7 @@ function SkuRawTable({
       <header className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">{caption}</p>
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h3>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h2>
         </div>
         {onExport && (
           <button
@@ -115,7 +117,7 @@ function SkuRawTable({
         </div>
       )}
       {!loading && data && data.rows.length === 0 && (
-        <p className="py-4 text-center text-sm text-gray-400 dark:text-emerald-600">No rows found for this dataset.</p>
+        <NoDataState message="No SKU data found for the selected filters." />
       )}
       {!loading && data && data.rows.length > 0 && (
         <>
@@ -123,9 +125,9 @@ function SkuRawTable({
             <table className="tbl">
               <thead>
                 <tr>
-                  <th className="w-12">#</th>
+                  <th scope="col" className="w-12">#</th>
                   {data.columns.map((c) => (
-                    <th key={c}>{c}</th>
+                    <th scope="col" key={c}>{c}</th>
                   ))}
                 </tr>
               </thead>
@@ -146,49 +148,14 @@ function SkuRawTable({
             </table>
           </div>
 
-          <footer className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-emerald-400">
-            <div>
-              {data.totalRecords > 0 ? (
-                <span>
-                  Showing {(((data.page - 1) * data.pageSize) + 1).toLocaleString()}–{Math.min(data.page * data.pageSize, data.totalRecords).toLocaleString()} of {data.totalRecords.toLocaleString()}
-                </span>
-              ) : (
-                <span>&nbsp;</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-gray-500 dark:text-emerald-400">Per page</label>
-              <select
-                value={pageSize}
-                onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="input w-auto py-1.5 px-2"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <button
-                type="button"
-                disabled={loading || (data?.page ?? 1) <= 1}
-                onClick={() => onPageChange(Math.max(page - 1, 1))}
-                className="btn-sm btn-outline disabled:opacity-40"
-              >
-                Prev
-              </button>
-              <span className="text-gray-600 dark:text-emerald-300">
-                Page {data?.page ?? page} / {data?.totalPages ?? '-'}
-              </span>
-              <button
-                type="button"
-                disabled={loading || (data?.page ?? 1) >= (data?.totalPages ?? 1)}
-                onClick={() => onPageChange(data ? Math.min(page + 1, data.totalPages) : page + 1)}
-                className="btn-sm btn-outline disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </footer>
+          <Pagination
+            page={data.page}
+            totalPages={data.totalPages}
+            totalRecords={data.totalRecords}
+            pageSize={pageSize}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
         </>
       )}
     </section>
@@ -359,7 +326,7 @@ export function ProductSkuDashboard() {
       {/* ── Chart ────────────────────────────────── */}
       <section className="panel">
         <div className="mb-3 flex items-center justify-between gap-4 flex-wrap">
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Monthly Trend</h3>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Monthly Trend</h2>
           <div className="flex gap-1">
             {(['qty', 'amount'] as const).map((m) => {
               const isActive = chartMetric === m;
@@ -434,7 +401,7 @@ export function ProductSkuDashboard() {
                   <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13 }}
+                    contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13, backgroundColor: 'var(--app-surface)', color: 'var(--app-text)' }}
                     formatter={(value: number) => [value.toLocaleString()]}
                     labelFormatter={(label) => `Month: ${label}`}
                   />
@@ -469,7 +436,7 @@ export function ProductSkuDashboard() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Search</h3>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Search</h2>
           </div>
           <input
             type="text"

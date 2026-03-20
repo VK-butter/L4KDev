@@ -1,4 +1,5 @@
 import type { AnalyticsSummary } from '@shared/index';
+import { brandPalette } from '../../theme/tokens';
 
 interface KpiBoardProps {
   summary?: AnalyticsSummary | null;
@@ -21,7 +22,9 @@ const kpiConfig = [
         <path d="M16 10a4 4 0 01-8 0" />
       </svg>
     ),
-    color: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400'
+    color: 'text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300',
+    valueTone: 'text-emerald-950 dark:text-emerald-50',
+    wash: `linear-gradient(135deg, ${brandPalette.brand[50]} 0%, rgba(255,255,255,0.96) 55%)`
   },
   {
     label: 'Total Revenue',
@@ -30,7 +33,9 @@ const kpiConfig = [
         <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
       </svg>
     ),
-    color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400'
+    color: 'text-cyan-700 bg-cyan-100 dark:bg-cyan-950/50 dark:text-cyan-300',
+    valueTone: 'text-cyan-950 dark:text-cyan-50',
+    wash: `linear-gradient(135deg, ${brandPalette.accent[100]} 0%, rgba(255,255,255,0.96) 58%)`
   },
   {
     label: 'Avg Order Value',
@@ -39,7 +44,9 @@ const kpiConfig = [
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
     ),
-    color: 'text-violet-600 bg-violet-100 dark:bg-violet-900/40 dark:text-violet-400'
+    color: 'text-amber-700 bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300',
+    valueTone: 'text-amber-950 dark:text-amber-50',
+    wash: `linear-gradient(135deg, ${brandPalette.highlight[100]} 0%, rgba(255,255,255,0.96) 58%)`
   },
   {
     label: 'Growth vs Prior',
@@ -48,7 +55,9 @@ const kpiConfig = [
         <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" />
       </svg>
     ),
-    color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/40 dark:text-amber-400'
+    color: 'text-rose-700 bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300',
+    valueTone: 'text-gray-900 dark:text-emerald-50',
+    wash: `linear-gradient(135deg, ${brandPalette.danger[100]} 0%, rgba(255,255,255,0.96) 60%)`
   }
 ];
 
@@ -68,13 +77,13 @@ export function KpiBoard({ summary, loading, error }: KpiBoardProps) {
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="kpi-board">
-      {kpiConfig.map(({ label, icon, color }, index) => {
+      {kpiConfig.map(({ label, icon, color, valueTone, wash }, index) => {
         const value = loading || !summary ? null : formatValue(index, summary);
         const isGrowth = index === 3;
         const growthPositive = isGrowth && summary && summary.growthVsPrior >= 0;
 
         return (
-          <div key={label} className="panel group flex flex-col gap-3">
+          <div key={label} className="animate-in panel group flex flex-col gap-3 border-white/70" style={{ background: wash, animationDelay: `${index * 80}ms` }}>
             <div className="flex items-center justify-between">
               <p className="section-heading">{label}</p>
               <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${color}`}>
@@ -90,7 +99,7 @@ export function KpiBoard({ summary, loading, error }: KpiBoardProps) {
                     ? growthPositive
                       ? 'text-emerald-600 dark:text-emerald-400'
                       : 'text-red-500 dark:text-red-400'
-                    : 'text-gray-900 dark:text-emerald-50'
+                    : valueTone
                 }`}>
                   {isGrowth && growthPositive && '+'}
                   {value ?? '—'}

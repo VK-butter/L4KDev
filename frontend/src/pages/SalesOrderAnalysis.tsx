@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import {
   analyticsApi,
@@ -8,6 +8,9 @@ import {
   type RawOrdersPage,
   type SalesTargetCompareResponse
 } from '../services/analyticsApi';
+import { brandPalette } from '../theme/tokens';
+import { NoDataState } from '../components/analytics/NoDataState';
+import { Pagination } from '../components/common/Pagination';
 
 type ApiErrorResponse = {
   response?: {
@@ -59,7 +62,7 @@ function MetricBox({ label, value, displayValue, icon, color, hint }: {
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-200 hover:scale-[1.02]
-      border-emerald-100 bg-white dark:border-white/[0.06] dark:bg-white/[0.03]">
+      border-emerald-100/80 bg-white dark:border-white/[0.06] dark:bg-white/[0.03]">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${color}`}>
         {icon}
       </div>
@@ -296,10 +299,10 @@ export function SalesOrderAnalysis() {
           displayValue={priceTarget > 0 ? `฿${fmtRev(priceTarget)}` : '—'}
           icon={TargetIcon}
           hint={`Target range: ${effectiveTargetStart} to ${effectiveTargetEnd}`}
-          color="bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300"
+          color="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300"
         />
         <MetricBox label="จำนวน (Qty)" value={achievedQty} icon={QtyIcon}
-          color="bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-300" />
+          color="bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" />
         <MetricBox label="% Achievement" displayValue={achievementPct != null ? `${achievementPct.toFixed(1)}%` : '—'} icon={OrdersIcon}
           color={achievementPct != null && achievementPct >= 100
             ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-300'
@@ -309,7 +312,7 @@ export function SalesOrderAnalysis() {
       {/* ── Revenue vs Target Progress ───────────── */}
       {priceTarget > 0 && (
         <section className="panel">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">ยอดขายจริง vs เป้ายอดขาย</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-300">ยอดขายจริง vs เป้ายอดขาย</p>
           <p className="mt-1 text-xs text-gray-500 dark:text-emerald-500">
             Target range: {effectiveTargetStart} to {effectiveTargetEnd} (monthly target)
           </p>
@@ -317,12 +320,12 @@ export function SalesOrderAnalysis() {
             <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">฿{achieved.toLocaleString()}</p>
             <p className="text-sm text-gray-400 dark:text-emerald-500">/ ฿{priceTarget.toLocaleString()}</p>
           </div>
-          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-            <div className={`h-full rounded-full transition-all ${priceDelta > 0 ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-emerald-500 dark:bg-emerald-400'}`}
+          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-cyan-100 dark:bg-cyan-950/50">
+            <div className={`h-full rounded-full transition-all ${priceDelta > 0 ? 'bg-cyan-500 dark:bg-cyan-400' : 'bg-emerald-500 dark:bg-emerald-400'}`}
               style={{ width: `${Math.min(pricePct, 100)}%` }} />
           </div>
           <div className="mt-1.5 flex items-center justify-between text-xs">
-            <span className="font-semibold text-gray-600 dark:text-emerald-300">{pricePct}%</span>
+            <span className="font-semibold text-cyan-700 dark:text-cyan-300">{pricePct}%</span>
             <span className={priceDelta > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-300'}>
               {priceDelta > 0 ? `ขาดอีก: ฿${priceDelta.toLocaleString()}` : `เกินเป้า: ฿${Math.abs(priceDelta).toLocaleString()}`}
             </span>
@@ -333,7 +336,7 @@ export function SalesOrderAnalysis() {
       {/* ── Status Breakdown ─────────────────────── */}
       <section className="panel">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Status Breakdown</h3>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Status Breakdown</h2>
           {statusFilter && (
             <button
               type="button"
@@ -350,21 +353,21 @@ export function SalesOrderAnalysis() {
           <div className="mx-auto w-full flex justify-center">
             {(() => {
               const chartData = [
-                { name: 'Complete', value: statusBreakdown.saled, color: '#2563eb', grad: 'blue' },
-                { name: 'Cancel', value: statusBreakdown.cancel, color: '#dc2626', grad: 'red' }
+                { name: 'Complete', value: statusBreakdown.saled, color: brandPalette.accent[500], grad: 'teal' },
+                { name: 'Cancel', value: statusBreakdown.cancel, color: brandPalette.danger[500], grad: 'rose' }
               ];
               return (
                 <div className="relative" data-testid="status-pie">
                   <ResponsiveContainer width={240} height={220}>
                     <PieChart>
                       <defs>
-                        <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#60a5fa" />
-                          <stop offset="100%" stopColor="#2563eb" />
+                        <linearGradient id="tealGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={brandPalette.accent[300]} />
+                          <stop offset="100%" stopColor={brandPalette.accent[700]} />
                         </linearGradient>
-                        <linearGradient id="redGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#f87171" />
-                          <stop offset="100%" stopColor="#dc2626" />
+                        <linearGradient id="roseGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={brandPalette.danger[300]} />
+                          <stop offset="100%" stopColor={brandPalette.danger[700]} />
                         </linearGradient>
                         <filter id="pieShadow">
                           <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.25" />
@@ -388,7 +391,7 @@ export function SalesOrderAnalysis() {
                         {chartData.map((entry) => (
                           <Cell
                             key={entry.name}
-                            fill={entry.grad === 'blue' ? 'url(#blueGradient)' : 'url(#redGradient)'}
+                            fill={entry.grad === 'teal' ? 'url(#tealGradient)' : 'url(#roseGradient)'}
                             opacity={statusFilter == null || entry.name === statusFilter ? 1 : 0.35}
                             stroke={entry.name === statusFilter ? '#fff' : 'none'}
                             strokeWidth={entry.name === statusFilter ? 4 : 0}
@@ -397,6 +400,7 @@ export function SalesOrderAnalysis() {
                         ))}
                       </Pie>
                       <Tooltip
+                        contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13, backgroundColor: 'var(--app-surface)', color: 'var(--app-text)' }}
                         formatter={(value: number, name: string) => [
                           value.toLocaleString(),
                           name
@@ -421,14 +425,14 @@ export function SalesOrderAnalysis() {
               {
                 label: 'Complete',
                 key: 'Complete',
-                color: '#2563eb',
+                color: brandPalette.accent[500],
                 value: statusBreakdown.saled,
                 pct: statusTotal > 0 ? Math.round((statusBreakdown.saled / statusTotal) * 1000) / 10 : 0
               },
               {
                 label: 'Cancel',
                 key: 'Cancel',
-                color: '#dc2626',
+                color: brandPalette.danger[500],
                 value: statusBreakdown.cancel,
                 pct: statusTotal > 0 ? Math.round((statusBreakdown.cancel / statusTotal) * 1000) / 10 : 0
               }
@@ -458,10 +462,12 @@ export function SalesOrderAnalysis() {
       </section>
 
       {/* ── Filters ──────────────────────────────── */}
-      <section className="panel border-l-4 border-emerald-400 dark:border-emerald-600 space-y-3">
+      <section
+        className="panel panel-wash border-l-4 border-emerald-400 dark:border-emerald-600 space-y-3"
+      >
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Filters</h3>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Filters</h2>
           <div className="ml-auto flex gap-1">
             {[
               { key: 'daily', fn: setDaily },
@@ -469,7 +475,7 @@ export function SalesOrderAnalysis() {
               { key: 'all', fn: clearDates }
             ].map((p) => (
               <button key={p.key} type="button" onClick={p.fn}
-                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 transition-all duration-150">
+                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 hover:bg-white/80 hover:text-emerald-900 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 transition-all duration-150">
                 {p.key}
               </button>
             ))}
@@ -497,7 +503,7 @@ export function SalesOrderAnalysis() {
         <header className="mb-3 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">Table</p>
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Raw Orders</h3>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Raw Orders</h2>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -524,13 +530,16 @@ export function SalesOrderAnalysis() {
           </div>
         )}
         {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-        {!loading && !error && data && (
+        {!loading && !error && data && data.rows.length === 0 && (
+          <NoDataState message="No orders matched the selected filters." />
+        )}
+        {!loading && !error && data && data.rows.length > 0 && (
           <div className="overflow-auto max-h-[32rem] rounded-xl border border-emerald-100 dark:border-white/[0.06]">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th className="w-12">#</th>
-                  {data.columns.map((c) => <th key={c}>{c}</th>)}
+                  <th scope="col" className="w-12">#</th>
+                  {data.columns.map((c) => <th scope="col" key={c}>{c}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -549,49 +558,16 @@ export function SalesOrderAnalysis() {
           </div>
         )}
 
-        <footer className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-emerald-400">
-          <div>
-            {data && data.totalRecords > 0 ? (
-              <span>
-                Showing {(((data.page - 1) * data.pageSize) + 1).toLocaleString()}–{Math.min(data.page * data.pageSize, data.totalRecords).toLocaleString()} of {data.totalRecords.toLocaleString()}
-              </span>
-            ) : (
-              <span>&nbsp;</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-gray-500 dark:text-emerald-400">Per page</label>
-            <select
-              value={pageSize}
-              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-              className="input w-auto py-1.5 px-2"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-            <button
-              type="button"
-              disabled={loading || (data?.page ?? 1) <= 1}
-              onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              className="btn-sm btn-outline disabled:opacity-40"
-            >
-              Prev
-            </button>
-            <span className="text-gray-600 dark:text-emerald-300">
-              Page {data?.page ?? page} / {data?.totalPages ?? '-'}
-            </span>
-            <button
-              type="button"
-              disabled={loading || (data?.page ?? 1) >= (data?.totalPages ?? 1)}
-              onClick={() => setPage((p) => (data ? Math.min(p + 1, data.totalPages) : p + 1))}
-              className="btn-sm btn-outline disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </footer>
+        {data && (
+          <Pagination
+            page={data.page}
+            totalPages={data.totalPages}
+            totalRecords={data.totalRecords}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => setPageSize(s)}
+          />
+        )}
       </section>
     </div>
   );

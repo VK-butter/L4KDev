@@ -98,23 +98,27 @@ export function Sidebar({ user }: SidebarProps) {
 
   return (
     <aside
-      className="hidden w-64 flex-shrink-0 flex-col gap-5 border-r border-emerald-200 bg-[#eaf4ee] px-4 py-5 lg:flex sticky top-16 self-start h-[calc(100vh-4rem)] overflow-y-auto transition-colors duration-200 dark:border-emerald-800/40 dark:bg-[#0c1b15]"
-      style={{ boxShadow: elevation.sidebar }}
+      className="animate-fade-in sticky top-16 hidden h-[calc(100vh-4rem)] w-64 flex-shrink-0 self-start overflow-y-auto border-r px-4 py-6 transition-colors duration-200 lg:flex lg:flex-col"
+      style={{
+        boxShadow: elevation.sidebar,
+        borderColor: 'color-mix(in oklch, var(--app-surface-border) 76%, transparent)',
+        background: 'var(--app-sidebar)'
+      }}
       aria-label="Dashboard navigation"
       role="complementary"
     >
-      {navGroups.map((group) => (
-        <div key={group.title}>
-          <p className="section-heading px-2 mb-2">
+      {navGroups.map((group, gi) => (
+        <div key={group.title} className={gi > 0 ? 'mt-6 pt-4 border-t border-[var(--app-surface-border)]/40' : ''}>
+          <p className="section-heading px-2 mb-2.5">
             {group.title}
           </p>
-          <ul className="space-y-0.5" role="list">
+          <ul className="space-y-1" role="list">
             {group.items.map((item) => {
               const isActive = 'to' in item && location.pathname + location.search === item.to;
-              const baseClass = `flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`;
-              const activeClass = 'bg-white text-emerald-700 shadow-sm dark:bg-[#0f2119] dark:text-emerald-300';
-              const inactiveClass = 'text-gray-700 hover:bg-white/60 hover:text-gray-900 dark:text-emerald-200/70 dark:hover:bg-[#0f2119]/50 dark:hover:text-emerald-200';
-              const disabledClass = 'cursor-not-allowed text-gray-400 dark:text-emerald-800';
+              const baseClass = `flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`;
+              const activeClass = 'border-emerald-400 bg-white text-[var(--app-accent-ink)] shadow-sm dark:border-emerald-600/60 dark:bg-emerald-950/60 dark:text-emerald-200';
+              const inactiveClass = 'border-transparent text-[var(--app-muted-text)] hover:border-emerald-200/80 hover:bg-white/70 hover:text-[var(--app-text)] dark:hover:border-emerald-800/60 dark:hover:bg-white/[0.06] dark:hover:text-[var(--app-text)]';
+              const disabledClass = 'cursor-not-allowed text-[var(--app-muted-text)] opacity-60';
 
               return (
                 <li key={item.label}>
@@ -167,4 +171,3 @@ export function Sidebar({ user }: SidebarProps) {
     </aside>
   );
 }
-

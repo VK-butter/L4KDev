@@ -1,15 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
-
 /* ─── Color Scheme ─────────────────────────────────── */
 :root {
   color-scheme: light;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --app-bg: oklch(97.2% 0.014 158);
+  --app-bg-alt: oklch(94.8% 0.022 163);
+  --app-surface: oklch(98.2% 0.012 160 / 0.95);
+  --app-surface-strong: oklch(94.5% 0.026 160 / 0.97);
+  --app-surface-border: oklch(82.0% 0.042 160 / 0.9);
+  --app-nav: oklch(97.0% 0.014 155 / 0.95);
+  --app-sidebar: oklch(93.2% 0.028 163 / 0.97);
+  --app-text: oklch(22.0% 0.036 168);
+  --app-muted-text: oklch(42.0% 0.030 168);
+  --app-accent: oklch(56.0% 0.148 164);
+  --app-accent-strong: oklch(46.0% 0.134 164);
+  --app-accent-soft: oklch(87.5% 0.060 164);
+  --app-accent-ink: oklch(34.0% 0.098 165);
+  --app-glow-a: oklch(80% 0.042 162 / 0.10);
+  --app-glow-b: oklch(85% 0.030 215 / 0.06);
+  --btn-shadow-rest: 0 10px 20px -18px rgba(21, 141, 100, 0.32);
+  --btn-shadow-hover: 0 14px 26px -20px rgba(21, 141, 100, 0.38);
+  --btn-shadow-press: 0 6px 14px -14px rgba(21, 141, 100, 0.28);
 }
 .dark {
   color-scheme: dark;
+  --app-bg: oklch(17.5% 0.014 168);
+  --app-bg-alt: oklch(21.5% 0.02 168);
+  --app-surface: oklch(24.4% 0.026 168 / 0.94);
+  --app-surface-strong: oklch(29.3% 0.032 168 / 0.96);
+  --app-surface-border: oklch(37.8% 0.028 168 / 0.9);
+  --app-nav: oklch(21.2% 0.022 168 / 0.92);
+  --app-sidebar: oklch(20.1% 0.024 168 / 0.96);
+  --app-text: oklch(94.7% 0.02 160);
+  --app-muted-text: oklch(75.2% 0.028 162);
+  --app-accent: oklch(73% 0.126 164);
+  --app-accent-strong: oklch(67% 0.123 164);
+  --app-accent-soft: oklch(28.5% 0.048 165);
+  --app-accent-ink: oklch(88.5% 0.045 164);
+  --app-glow-a: oklch(40% 0.026 164 / 0.07);
+  --app-glow-b: oklch(46% 0.02 210 / 0.05);
+  --btn-shadow-rest: 0 10px 22px -18px rgba(9, 48, 38, 0.34);
+  --btn-shadow-hover: 0 14px 30px -20px rgba(16, 86, 67, 0.4);
+  --btn-shadow-press: 0 6px 12px -12px rgba(6, 29, 23, 0.4);
 }
 
 /* ─── Base ─────────────────────────────────────────── */
@@ -19,15 +56,14 @@ html {
 
 body {
   font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-  background-color: #f5faf7;
-  color: #111827;
+  background:
+    radial-gradient(circle at top left, var(--app-glow-a), transparent 38%),
+    radial-gradient(circle at top right, var(--app-glow-b), transparent 32%),
+    linear-gradient(180deg, color-mix(in oklch, var(--app-bg), var(--app-bg-alt) 12%) 0%, var(--app-bg) 100%);
+  background-attachment: fixed;
+  color: var(--app-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-.dark body {
-  background-color: #07130f;
-  color: #f0faf4;
 }
 
 @layer base {
@@ -39,52 +75,169 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #a7f3d0;
+  background: color-mix(in oklch, var(--app-accent) 44%, transparent);
   border-radius: 99px;
 }
-.dark ::-webkit-scrollbar-thumb { background: #065f46; }
+.dark ::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--app-accent) 34%, var(--app-bg-alt) 66%);
+}
+
+/* ─── Keyframes ─────────────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes pulse-once {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.6; }
+  100% { opacity: 1; }
+}
 
 /* ─── Component Primitives ─────────────────────────── */
 @layer components {
 
   /* Card / Panel */
   .panel {
-    @apply rounded-2xl border border-emerald-100/80 bg-white/95 p-5 shadow-sm
-           transition-colors duration-200
-           dark:border-white/[0.07] dark:bg-[#0f2119]/90 dark:shadow-black/30;
+    @apply rounded-2xl p-5 shadow-sm transition-colors duration-200;
+    border: 1px solid var(--app-surface-border);
+    background: color-mix(in oklch, var(--app-surface) 96%, white 4%);
+    box-shadow:
+      0 14px 28px -28px color-mix(in oklch, var(--app-accent-strong) 14%, transparent),
+      0 1px 0 color-mix(in oklch, white 70%, transparent);
+  }
+
+  /* Gentle gradient wash (theme-aware) */
+  .panel-wash {
+    background-image:
+      radial-gradient(circle at top left, color-mix(in oklch, var(--app-accent-soft) 70%, transparent), transparent 52%),
+      radial-gradient(circle at bottom right, color-mix(in oklch, var(--app-accent-soft) 45%, transparent), transparent 58%),
+      linear-gradient(135deg,
+        color-mix(in oklch, var(--app-accent-soft) 34%, white 66%) 0%,
+        color-mix(in oklch, var(--app-surface) 92%, white 8%) 58%,
+        color-mix(in oklch, var(--app-accent-soft) 18%, var(--app-surface) 82%) 100%);
+    background-blend-mode: normal;
   }
 
   /* Section label */
   .section-heading {
-    @apply text-[10px] font-semibold uppercase tracking-[0.18em]
-           text-emerald-500 dark:text-emerald-400;
+    @apply text-[10px] font-semibold uppercase tracking-[0.18em];
+    color: var(--app-accent-strong);
   }
 
   /* ── Buttons ───────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl
-           font-semibold transition-all duration-150
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl
+           font-semibold transition-all duration-200
            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
            focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-50;
+    isolation: isolate;
+    transform: translateY(0) scale(1);
+    transition-timing-function: var(--ease-out-quart);
+    box-shadow: var(--btn-shadow-rest);
+  }
+  .btn::after {
+    content: '';
+    position: absolute;
+    inset: -0.0625rem;
+    border-radius: inherit;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.16), transparent 72%);
+    opacity: 0;
+    transform: scale(0.96);
+    transition:
+      opacity 220ms var(--ease-out-quart),
+      transform 220ms var(--ease-out-quart);
+    pointer-events: none;
+    z-index: -1;
+  }
+  .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: var(--btn-shadow-hover);
+  }
+  .btn:hover:not(:disabled)::after,
+  .btn:focus-visible::after {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: var(--btn-shadow-press);
   }
   .btn-sm  { @apply btn text-xs px-3 py-1.5; }
   .btn-md  { @apply btn text-sm px-4 py-2; }
   .btn-lg  { @apply btn text-sm px-5 py-2.5; }
 
+  .icon-btn {
+    @apply relative inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg border
+           transition-all duration-200
+           focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400;
+    border-color: color-mix(in oklch, var(--app-surface-border) 86%, transparent);
+    background: color-mix(in oklch, var(--app-surface) 94%, transparent);
+    color: var(--app-accent-ink);
+    transform: translateY(0) scale(1);
+    transition-timing-function: var(--ease-out-quart);
+    box-shadow: 0 8px 14px -14px color-mix(in oklch, var(--app-accent-strong) 18%, transparent);
+  }
+  .icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at center, rgba(16, 185, 129, 0.1), transparent 74%);
+    opacity: 0;
+    transform: scale(0.88);
+    transition:
+      opacity 200ms var(--ease-out-quart),
+      transform 200ms var(--ease-out-quart);
+    pointer-events: none;
+  }
+  .icon-btn:hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--app-accent) 38%, var(--app-surface-border));
+    background: color-mix(in oklch, var(--app-accent-soft) 30%, var(--app-surface) 70%);
+    transform: translateY(-1px);
+  }
+  .icon-btn:hover:not(:disabled)::after,
+  .icon-btn:focus-visible::after {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .icon-btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
   .btn-primary {
-    @apply bg-emerald-600 text-white shadow-sm
-           hover:bg-emerald-500 active:bg-emerald-700
-           dark:bg-emerald-500 dark:hover:bg-emerald-400;
+    @apply text-white shadow-sm;
+    background: var(--app-accent-strong);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--app-accent-strong) 90%, black 10%);
   }
   .btn-outline {
-    @apply border border-emerald-200 bg-white text-emerald-700
-           hover:border-emerald-400 hover:bg-emerald-50
-           dark:border-white/10 dark:bg-transparent dark:text-emerald-300
-           dark:hover:border-emerald-500 dark:hover:bg-emerald-900/30;
+    @apply border;
+    border-color: color-mix(in oklch, var(--app-accent) 24%, var(--app-surface-border));
+    background: color-mix(in oklch, var(--app-surface) 92%, white 8%);
+    color: var(--app-accent-ink);
+  }
+  .btn-outline:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--app-accent-soft) 18%, var(--app-surface) 82%);
+    border-color: color-mix(in oklch, var(--app-accent) 42%, var(--app-surface-border));
   }
   .btn-ghost {
-    @apply bg-transparent text-emerald-600 hover:bg-emerald-50
-           dark:text-emerald-300 dark:hover:bg-emerald-900/40;
+    @apply border;
+    border-color: color-mix(in oklch, var(--app-surface-border) 76%, transparent);
+    background: color-mix(in oklch, var(--app-surface) 88%, transparent);
+    color: var(--app-accent-ink);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--app-accent) 30%, var(--app-surface-border));
+    background: color-mix(in oklch, var(--app-accent-soft) 14%, var(--app-surface) 86%);
   }
   .btn-danger {
     @apply bg-rose-50 text-rose-600 border border-rose-200
@@ -94,12 +247,18 @@ body {
 
   /* ── Inputs ────────────────────────────── */
   .input {
-    @apply w-full rounded-xl border border-emerald-100 bg-white/90 px-3.5 py-2.5
-           text-sm text-gray-900 placeholder-gray-400 shadow-sm transition
-           focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100
-           dark:border-white/10 dark:bg-[#0d1f17]/80 dark:text-emerald-100
-           dark:placeholder-emerald-700 dark:focus:border-emerald-500
-           dark:focus:ring-emerald-900/40;
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm shadow-sm transition;
+    border: 1px solid color-mix(in oklch, var(--app-surface-border) 82%, transparent);
+    background: color-mix(in oklch, var(--app-surface) 88%, transparent);
+    color: var(--app-text);
+  }
+  .input::placeholder {
+    color: color-mix(in oklch, var(--app-muted-text) 72%, transparent);
+  }
+  .input:focus {
+    outline: none;
+    border-color: color-mix(in oklch, var(--app-accent) 60%, var(--app-surface-border));
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--app-accent-soft) 78%, transparent);
   }
   /* legacy alias */
   .input-elevated { @apply input; }
@@ -110,7 +269,7 @@ body {
            text-xs font-semibold tracking-wide;
   }
   .badge-green {
-    @apply badge bg-emerald-100 text-emerald-800
+    @apply badge bg-emerald-200 text-emerald-900
            dark:bg-emerald-900/50 dark:text-emerald-300;
   }
   .badge-amber {
@@ -126,18 +285,23 @@ body {
            dark:bg-blue-900/40 dark:text-blue-300;
   }
   .badge-gray {
-    @apply badge bg-gray-100 text-gray-600
-           dark:bg-white/10 dark:text-gray-300;
+    @apply badge bg-gray-100 text-gray-700
+           dark:bg-white/[0.12] dark:text-gray-200;
   }
 
   /* ── Filter Chips ──────────────────────── */
   .chip {
-    @apply rounded-full border border-gray-200 bg-white px-3 py-1
-           text-xs font-medium text-gray-500 cursor-pointer
-           transition-all duration-150
-           hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700
-           dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-400
-           dark:hover:border-white/20 dark:hover:bg-white/[0.08];
+    @apply cursor-pointer rounded-full border px-3 py-1
+           text-xs font-medium transition-all duration-150
+           active:scale-95 select-none;
+    border-color: color-mix(in oklch, var(--app-surface-border) 90%, transparent);
+    background: color-mix(in oklch, var(--app-surface) 94%, transparent);
+    color: var(--app-muted-text);
+  }
+  .chip:hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--app-accent) 40%, var(--app-surface-border));
+    background: color-mix(in oklch, var(--app-accent-soft) 18%, var(--app-surface) 82%);
+    color: var(--app-text);
   }
   .chip-active {
     @apply border-emerald-500 bg-emerald-500 text-white font-semibold
@@ -150,20 +314,23 @@ body {
   /* ── Table ─────────────────────────────── */
   .tbl { @apply min-w-full border-collapse text-sm; }
   .tbl thead tr {
-    @apply border-b border-emerald-100 dark:border-emerald-800/60;
+    @apply border-b border-emerald-200 dark:border-emerald-800/60;
   }
   .tbl th {
-    @apply sticky top-0 bg-emerald-50/95 px-3 py-2.5 text-left
-           text-[10px] font-semibold uppercase tracking-widest text-emerald-700
-           dark:bg-[#0c1f16] dark:text-emerald-300 backdrop-blur;
+    @apply sticky top-0 bg-emerald-100/95 px-3 py-2.5 text-left
+           text-[10px] font-semibold uppercase tracking-widest text-emerald-900
+           dark:bg-[#0f2419] dark:text-emerald-300/90 backdrop-blur;
   }
   .tbl td {
-    @apply px-3 py-2.5 text-gray-800 dark:text-slate-100;
+    @apply px-3 py-2.5 text-gray-900 dark:text-gray-100;
   }
   .tbl tbody tr {
-    @apply border-b border-emerald-100/60 transition-colors
-           hover:bg-emerald-50/80 dark:border-white/[0.06]
+    @apply border-b border-emerald-100 transition-colors
+           hover:bg-emerald-100/70 dark:border-white/[0.06]
            dark:hover:bg-white/[0.04];
+  }
+  .tbl tbody tr:focus-within {
+    @apply outline outline-2 outline-offset-[-2px] outline-emerald-400/60;
   }
   .tbl tbody tr:nth-child(even) {
     @apply dark:bg-white/[0.025];
@@ -172,12 +339,82 @@ body {
 
   /* ── Skeleton ──────────────────────────── */
   .skeleton {
-    @apply animate-pulse rounded-lg bg-emerald-100/80
+    @apply animate-pulse rounded-lg bg-emerald-200/70
            dark:bg-emerald-900/40;
   }
 
   /* ── Divider ───────────────────────────── */
   .divider {
-    @apply border-t border-emerald-100 dark:border-white/[0.07];
+    border-top: 1px solid color-mix(in oklch, var(--app-surface-border) 74%, transparent);
+  }
+
+  /* ── Collapsible Smooth Reveal ─────────── */
+  .collapsible-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 280ms var(--ease-out-quart);
+  }
+  .collapsible-body[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+  .collapsible-body > * {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── Entrance Animations ───────────────── */
+  .animate-in {
+    animation: fade-in-up 380ms var(--ease-out-quart) both;
+  }
+  .animate-scale-in {
+    animation: scale-in 300ms var(--ease-out-quart) both;
+  }
+  .animate-fade-in {
+    animation: fade-in 300ms var(--ease-out-quart) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .btn,
+  .btn:hover:not(:disabled),
+  .btn:active:not(:disabled),
+  .icon-btn,
+  .icon-btn:hover:not(:disabled),
+  .icon-btn:active:not(:disabled) {
+    transform: none;
+  }
+
+  .btn::after,
+  .icon-btn::after {
+    display: none;
+  }
+
+  .collapsible-body {
+    transition: none;
+    grid-template-rows: 1fr;
+  }
+  .collapsible-body[data-open="false"] {
+    display: none;
+  }
+
+  .animate-in,
+  .animate-scale-in,
+  .animate-fade-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }

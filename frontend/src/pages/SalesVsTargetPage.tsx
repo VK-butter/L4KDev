@@ -57,9 +57,11 @@ function toggleValue(items: string[], value: string) {
 }
 
 function fmtRev(value: number) {
-  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${sign}฿${(abs / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `${sign}฿${(abs / 1_000).toFixed(1)}K`;
+  return `${sign}฿${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
 function formatPct(value: number | null) {
@@ -145,11 +147,11 @@ function BreakdownTable({ title, rows }: { title: string; rows: SalesTargetBreak
           <table className="tbl">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Actual</th>
-                <th>Target</th>
-                <th>Gap</th>
-                <th>Achv%</th>
+                <th scope="col">Name</th>
+                <th scope="col">Actual</th>
+                <th scope="col">Target</th>
+                <th scope="col">Gap</th>
+                <th scope="col" title="Achievement percentage">Achv%</th>
               </tr>
             </thead>
             <tbody>
@@ -159,7 +161,7 @@ function BreakdownTable({ title, rows }: { title: string; rows: SalesTargetBreak
                   : 'text-rose-600 dark:text-rose-400';
                 return (
                   <tr key={row.key}>
-                    <td>{row.key}</td>
+                    <td className="max-w-[180px] truncate" title={row.key}>{row.key}</td>
                     <td className="tabular-nums text-right">{fmtRev(row.actualRevenue)}</td>
                     <td className="tabular-nums text-right">{fmtRev(row.targetRevenue)}</td>
                     <td className={`tabular-nums text-right font-semibold ${tone}`}>{fmtRev(row.gapRevenue)}</td>
@@ -204,13 +206,17 @@ function CollapsibleSection({ title, desc, defaultOpen, open: extOpen, onToggle,
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
           <div className="min-w-0">
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h3>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h2>
             {desc && <p className="text-xs text-gray-400 dark:text-emerald-500 mt-0.5">{desc}</p>}
           </div>
         </button>
-        {isOpen && actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        <div className={`flex items-center gap-2 shrink-0 transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+          {actions}
+        </div>
       </div>
-      {isOpen && <div className="mt-3">{children}</div>}
+      <div className="collapsible-body" data-open={isOpen ? 'true' : 'false'}>
+        <div><div className="mt-3">{children}</div></div>
+      </div>
     </section>
   );
 }
@@ -814,7 +820,7 @@ export function SalesVsTargetPage() {
                     <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
                       tickFormatter={(v: number) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
                     <Tooltip
-                      contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13 }}
+                      contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13, backgroundColor: 'var(--app-surface)', color: 'var(--app-text)' }}
                       formatter={(value: number) => [fmtRev(value)]}
                     />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -847,7 +853,8 @@ export function SalesVsTargetPage() {
           <div className="flex items-center gap-2">
             {pivotData && (
               <button type="button" onClick={handleExportPivotExcel}
-                className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500 text-white shadow-sm hover:bg-emerald-600 transition-all">
+                disabled={!pivotData}
+                className="btn-sm btn-primary">
                 Export Excel
               </button>
             )}

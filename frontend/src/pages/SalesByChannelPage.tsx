@@ -64,9 +64,11 @@ function fmt(value: number) {
 }
 
 function fmtRev(value: number) {
-  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${sign}฿${(abs / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `${sign}฿${(abs / 1_000).toFixed(1)}K`;
+  return `${sign}฿${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
 /* ── Animated number counter ────────────────────── */
@@ -240,10 +242,10 @@ function MiniTable({ rows, max = 5 }: { rows: Array<{ key: string; orders: numbe
   return (
     <div className="overflow-auto rounded-lg border border-emerald-100 dark:border-white/[0.06]" style={{ maxHeight: '220px' }}>
       <table className="tbl">
-        <thead><tr><th>Name</th><th>Orders</th><th>Revenue</th><th>Qty</th></tr></thead>
+        <thead><tr><th scope="col">Name</th><th scope="col">Orders</th><th scope="col">Revenue</th><th scope="col">Qty</th></tr></thead>
         <tbody>
           {display.map((r) => (
-            <tr key={r.key}><td>{r.key}</td><td className="tabular-nums">{fmt(r.orders)}</td><td className="tabular-nums">{fmtRev(r.revenue)}</td><td className="tabular-nums">{fmt(r.quantity)}</td></tr>
+            <tr key={r.key}><td className="max-w-[160px] truncate" title={r.key}>{r.key}</td><td className="tabular-nums">{fmt(r.orders)}</td><td className="tabular-nums">{fmtRev(r.revenue)}</td><td className="tabular-nums">{fmt(r.quantity)}</td></tr>
           ))}
         </tbody>
       </table>
@@ -268,13 +270,17 @@ function CollapsibleSection({ title, desc, defaultOpen, open: extOpen, onToggle,
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
           <div className="min-w-0">
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h3>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">{title}</h2>
             {desc && <p className="text-xs text-gray-400 dark:text-emerald-500 mt-0.5">{desc}</p>}
           </div>
         </button>
-        {isOpen && actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        <div className={`flex items-center gap-2 shrink-0 transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+          {actions}
+        </div>
       </div>
-      {isOpen && <div className="mt-3">{children}</div>}
+      <div className="collapsible-body" data-open={isOpen ? 'true' : 'false'}>
+        <div><div className="mt-3">{children}</div></div>
+      </div>
     </section>
   );
 }
@@ -762,7 +768,7 @@ export function SalesByChannelPage() {
                       <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
                         tickFormatter={(v: number) => isRev ? (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)) : (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))} />
                       <Tooltip
-                        contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13 }}
+                        contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13, backgroundColor: 'var(--app-surface)', color: 'var(--app-text)' }}
                         formatter={(value: number) => [isRev ? fmtRev(value) : fmt(value)]}
                       />
                       <Legend wrapperStyle={{ fontSize: 12 }} />

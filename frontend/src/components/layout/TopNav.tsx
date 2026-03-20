@@ -21,8 +21,12 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-emerald-100/60 bg-white/95 px-4 backdrop-blur-md transition-colors duration-200 dark:border-white/[0.07] dark:bg-[#0a1c12]/95"
-      style={{ boxShadow: elevation.nav }}
+      className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur-md transition-colors duration-200"
+      style={{
+        boxShadow: elevation.nav,
+        borderColor: 'color-mix(in oklch, var(--app-surface-border) 74%, transparent)',
+        background: 'var(--app-nav)'
+      }}
       role="banner"
       aria-label="Application header"
     >
@@ -31,7 +35,7 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-600 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+          className="icon-btn"
           aria-label="Toggle sidebar"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -46,7 +50,11 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
             <img
               src={logoUrl}
               alt="Brand logo"
-              className="h-9 w-9 rounded-xl object-contain bg-white border border-emerald-100 dark:border-white/10"
+              className="h-9 w-9 rounded-xl border object-contain"
+              style={{
+                backgroundColor: 'color-mix(in oklch, var(--app-surface) 94%, white 6%)',
+                borderColor: 'color-mix(in oklch, var(--app-surface-border) 76%, transparent)'
+              }}
               onError={() => setLogoError(true)}
             />
           ) : (
@@ -58,10 +66,10 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
             </span>
           )}
           <div className="hidden sm:block leading-none">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-500 dark:text-emerald-400">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--app-accent-strong)' }}>
               Sales Dashboard
             </p>
-            <p className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-emerald-100">
+            <p className="mt-0.5 text-sm font-semibold text-[var(--app-text)]">
               Learning for Kidz
             </p>
           </div>
@@ -76,7 +84,7 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
           onClick={toggleTheme}
           aria-pressed={theme === 'dark'}
           aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-600 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+          className="icon-btn"
         >
           {theme === 'dark' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -110,12 +118,15 @@ export function TopNav({ user, onLogout, onAdminMenu, onToggleSidebar }: TopNavP
         )}
 
         {/* User info */}
-        <div className="hidden items-center gap-2.5 border-l border-emerald-100 pl-3 dark:border-white/10 md:flex">
+        <div
+          className="hidden items-center gap-2.5 border-l pl-3 md:flex"
+          style={{ borderColor: 'color-mix(in oklch, var(--app-surface-border) 70%, transparent)' }}
+        >
           <div className="text-right leading-none">
-            <p className="text-sm font-semibold text-gray-900 dark:text-emerald-100">
+            <p className="text-sm font-semibold text-[var(--app-text)]">
               {user?.displayName ?? 'Guest'}
             </p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-500 dark:text-emerald-400">
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--app-accent-strong)' }}>
               {user?.role ?? ''}
             </p>
           </div>

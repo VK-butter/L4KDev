@@ -18,14 +18,32 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173';
+const EXTRA_FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+function isAllowedOrigin(origin: string) {
+  const explicitOrigins = new Set([
+    FRONTEND_ORIGIN,
+    'http://localhost:5174',
+    'http://localhost:5175',
+    ...EXTRA_FRONTEND_ORIGINS
+  ]);
+
+  if (explicitOrigins.has(origin)) {
+    return true;
+  }
+
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+}
 
 app.set('trust proxy', 1);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      const allowed = [FRONTEND_ORIGIN, 'http://localhost:5174', 'http://localhost:5175'];
-      if (!origin || allowed.includes(origin)) callback(null, true);
+      if (!origin || isAllowedOrigin(origin)) callback(null, true);
       else callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true

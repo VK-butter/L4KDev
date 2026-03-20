@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import { NoDataState } from './NoDataState';
 import { useCallback } from 'react';
+import { chartPalette } from '../../theme/tokens';
 
 type BarClickPayload = {
   payload?: { category?: string };
@@ -79,15 +80,15 @@ export function RevenueByCategoryChart({ data, loading, selectedCategory, onSele
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ left: 0, right: 4, top: 4, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(16,185,129,0.1)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartPalette.grid} vertical={false} />
               <XAxis
                 dataKey="category"
-                tick={{ fontSize: 11, fill: '#6b7280' }}
+                tick={{ fontSize: 11, fill: chartPalette.axis }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: '#6b7280' }}
+                tick={{ fontSize: 11, fill: chartPalette.axis }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
@@ -95,9 +96,11 @@ export function RevenueByCategoryChart({ data, loading, selectedCategory, onSele
               <Tooltip
                 contentStyle={{
                   borderRadius: '12px',
-                  border: '1px solid rgba(16,185,129,0.2)',
+                  border: `1px solid ${chartPalette.tooltipBorder}`,
                   boxShadow: '0 10px 25px -10px rgba(0,0,0,0.15)',
-                  fontSize: '13px'
+                  fontSize: '13px',
+                  backgroundColor: 'var(--app-surface)',
+                  color: 'var(--app-text)'
                 }}
                 formatter={(value: number) => [fmt.format(value), 'Revenue']}
               />
@@ -109,11 +112,11 @@ export function RevenueByCategoryChart({ data, loading, selectedCategory, onSele
                   }
                 }}
               >
-                {data.map((entry) => (
+                {data.map((entry, index) => (
                   <Cell
                     key={entry.category}
                     data-category={entry.category}
-                    fill={entry.category === selectedCategory ? '#059669' : '#34d399'}
+                    fill={entry.category === selectedCategory ? '#0f7f48' : chartPalette.categorical[index % chartPalette.categorical.length]}
                     opacity={selectedCategory && entry.category !== selectedCategory ? 0.45 : 1}
                     style={{ cursor: 'pointer' }}
                     onClick={() => onSelectCategory?.(entry.category === selectedCategory ? null : entry.category)}

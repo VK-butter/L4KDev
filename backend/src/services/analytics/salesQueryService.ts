@@ -2,8 +2,9 @@ import type { SalesOrder } from '@shared/index';
 import { mockDataStore } from '../../data/mocks';
 
 export interface FilterOptions {
-  dateStart: string;
-  dateEnd: string;
+  dateStart?: string;
+  dateEnd?: string;
+  dateRanges?: Array<{ start: string; end: string }>;
   categories?: string[];
   statuses?: SalesOrder['status'][];
 }
@@ -50,12 +51,26 @@ function inRange(orderDate: string, start: Date, end: Date) {
   return current >= start && current <= end;
 }
 
+function normalizeRanges(filters: FilterOptions) {
+  const ranges =
+    filters.dateRanges && filters.dateRanges.length > 0
+      ? filters.dateRanges
+      : filters.dateStart && filters.dateEnd
+        ? [{ start: filters.dateStart, end: filters.dateEnd }]
+        : [];
+  return ranges
+    .map((r) => (r.start <= r.end ? r : { start: r.end, end: r.start }))
+    .sort((a, b) => a.start.localeCompare(b.start));
+}
+
 function filterOrders(orders: SalesOrder[], filters: FilterOptions) {
-  const start = parseDate(filters.dateStart);
-  const end = parseDate(filters.dateEnd);
+  const ranges = normalizeRanges(filters).map((r) => ({
+    start: parseDate(r.start),
+    end: parseDate(r.end)
+  }));
 
   return orders.filter((order) => {
-    if (!inRange(order.orderDate, start, end)) {
+    if (ranges.length > 0 && !ranges.some((r) => inRange(order.orderDate, r.start, r.end))) {
       return false;
     }
     if (filters.categories && filters.categories.length > 0) {
@@ -87,14 +102,15 @@ export async function getSummary(filters: FilterOptions): Promise<SummaryResult>
 
   const averageOrderValue = totalOrders === 0 ? 0 : totalRevenue / totalOrders;
 
-  const rangeMs =
-    parseDate(filters.dateEnd).getTime() - parseDate(filters.dateStart).getTime();
-  const priorEnd = parseDate(filters.dateStart);
-  const priorStart = new Date(priorEnd.getTime() - rangeMs);
-
-  const prior = orders.filter((order) =>
-    inRange(order.orderDate, priorStart, priorEnd)
-  );
+  const ranges = normalizeRanges(filters);
+  const prior = ranges.length === 1
+    ? (() => {
+        const rangeMs = parseDate(ranges[0].end).getTime() - parseDate(ranges[0].start).getTime();
+        const priorEnd = parseDate(ranges[0].start);
+        const priorStart = new Date(priorEnd.getTime() - rangeMs);
+        return orders.filter((order) => inRange(order.orderDate, priorStart, priorEnd));
+      })()
+    : [];
   const priorRevenue = prior.reduce((sum, order) => sum + order.revenue, 0);
 
   return {

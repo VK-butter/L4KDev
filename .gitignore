@@ -3,9 +3,12 @@ node_modules
 .env
 *.env
 *.env.local
+docker-compose.yml
 deployment/.env
 deployment/env/backend.env
 frontend/test-results/
 frontend/dist/
 backend/dist/
 shared/dist/
+frontend/*.tsbuildinfo
+graphify-out/

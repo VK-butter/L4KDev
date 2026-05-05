@@ -7,8 +7,9 @@ import type {
 import { apiClient } from './apiClient';
 
 export interface AnalyticsFilterParams {
-  dateStart: string;
-  dateEnd: string;
+  dateStart?: string;
+  dateEnd?: string;
+  dateRanges?: DateRangeInput[];
   categories?: string[];
   statuses?: string[];
 }
@@ -31,9 +32,26 @@ export interface RawOrdersPage {
   totalPages: number;
 }
 
+export interface DateRangeInput {
+  start: string;
+  end: string;
+}
+
+function appendDateFilters(
+  sp: URLSearchParams,
+  params: { dateStart?: string; dateEnd?: string; dateRanges?: DateRangeInput[] }
+) {
+  if (params.dateStart) sp.set('dateStart', params.dateStart);
+  if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
+  if (params.dateRanges && params.dateRanges.length > 0) {
+    sp.set('dateRanges', JSON.stringify(params.dateRanges));
+  }
+}
+
 export interface VsStageFilter {
-  dateStart: string;
-  dateEnd: string;
+  dateStart?: string;
+  dateEnd?: string;
+  dateRanges?: DateRangeInput[];
   statuses?: string[];
   channels?: string[];
   categories?: string[];
@@ -100,8 +118,9 @@ export interface VsCompareResponse {
 }
 
 export interface SalesTargetFilter {
-  dateStart: string;
-  dateEnd: string;
+  dateStart?: string;
+  dateEnd?: string;
+  dateRanges?: DateRangeInput[];
   statuses?: string[];
   channels?: string[];
   categories?: string[];
@@ -158,8 +177,11 @@ export interface TargetPivotResponse {
 
 function buildQuery(params: QueryParams) {
   const searchParams = new URLSearchParams();
-  searchParams.set('dateStart', params.dateStart);
-  searchParams.set('dateEnd', params.dateEnd);
+  if (params.dateStart) searchParams.set('dateStart', params.dateStart);
+  if (params.dateEnd) searchParams.set('dateEnd', params.dateEnd);
+  if (params.dateRanges && params.dateRanges.length > 0) {
+    searchParams.set('dateRanges', JSON.stringify(params.dateRanges));
+  }
   if (params.categories && params.categories.length > 0) {
     searchParams.set('categories', params.categories.join(','));
   }
@@ -205,12 +227,11 @@ export const analyticsApi = {
     apiClient.get<{ data: AnalyticsDrilldownResponse }>(
       `/analytics/orders/drilldown?${buildQuery(params)}`
     ),
-  rawOrders: (params: { page?: number; pageSize?: number; dateStart?: string; dateEnd?: string; status?: string; q?: string }) => {
+  rawOrders: (params: { page?: number; pageSize?: number; dateStart?: string; dateEnd?: string; dateRanges?: DateRangeInput[]; status?: string; q?: string }) => {
     const sp = new URLSearchParams();
     if (typeof params.page === 'number') sp.set('page', String(params.page));
     if (typeof params.pageSize === 'number') sp.set('pageSize', String(params.pageSize));
-    if (params.dateStart) sp.set('dateStart', params.dateStart);
-    if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
+    appendDateFilters(sp, params);
     if (params.status) sp.set('status', params.status);
     if (params.q) sp.set('q', params.q);
     return apiClient.get<{ data: RawOrdersPage }>(
@@ -220,10 +241,9 @@ export const analyticsApi = {
 };
 
 export const analyticsSummaryApi = {
-  rawSummary: (params: { dateStart?: string; dateEnd?: string; status?: string }) => {
+  rawSummary: (params: { dateStart?: string; dateEnd?: string; dateRanges?: DateRangeInput[]; status?: string }) => {
     const sp = new URLSearchParams();
-    if (params.dateStart) sp.set('dateStart', params.dateStart);
-    if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
+    appendDateFilters(sp, params);
     if (params.status) sp.set('status', params.status);
     return apiClient.get<{ data: { totalRecords: number; totalRevenue?: number; totalQuantity?: number } }>(
       `/analytics/orders/raw/summary?${sp.toString()}`
@@ -232,13 +252,22 @@ export const analyticsSummaryApi = {
 };
 
 export const analyticsStatusApi = {
-  rawStatus: (params: { dateStart?: string; dateEnd?: string }) => {
+  rawStatus: (params: { dateStart?: string; dateEnd?: string; dateRanges?: DateRangeInput[] }) => {
     const sp = new URLSearchParams();
-    if (params.dateStart) sp.set('dateStart', params.dateStart);
-    if (params.dateEnd) sp.set('dateEnd', params.dateEnd);
-    return apiClient.get<{ data: { total: number; rows: Array<{ status: string; count: number }> } }>(
-      `/analytics/orders/raw/status?${sp.toString()}`
-    );
+    appendDateFilters(sp, params);
+    return apiClient.get<{
+      data: {
+        total: number;
+        distinctOrderTotal: number;
+        /** Order-level: any cancel line => whole order is Cancel; Complete = no cancel + has complete line; Other = rest. */
+        orderLevelHypothesis: {
+          cancelWins: number;
+          completeOnly: number;
+          otherOnly: number;
+        };
+        rows: Array<{ status: string; count: number; distinctOrders: number }>;
+      };
+    }>(`/analytics/orders/raw/status?${sp.toString()}`);
   }
 };
 
@@ -254,7 +283,7 @@ export const analyticsVsApi = {
 export const analyticsSalesTargetApi = {
   getSalesTargetOptions: (filterBase: SalesTargetFilter) =>
     apiClient.post<{ data: SalesTargetOptionsResponse }>('/analytics/orders/target/options', filterBase),
-  compareSalesTarget: (filter: SalesTargetFilter) =>
+  compareSalesTarget: (filter: SalesTargetFilter & { dateRanges?: DateRangeInput[] }) =>
     apiClient.post<{ data: SalesTargetCompareResponse }>('/analytics/orders/target/compare', filter),
   getTargetPivot: (params: { year: number; statuses?: string[]; channels?: string[]; categories?: string[] }) =>
     apiClient.post<{ data: TargetPivotResponse }>('/analytics/orders/target/pivot', params)

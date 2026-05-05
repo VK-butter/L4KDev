@@ -73,7 +73,6 @@ type SkuTableProps = {
   caption: string;
   data: SkuRawPage | null;
   loading: boolean;
-  page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
@@ -85,7 +84,6 @@ function SkuRawTable({
   caption,
   data,
   loading,
-  page,
   pageSize,
   onPageChange,
   onPageSizeChange,
@@ -168,6 +166,7 @@ export function ProductSkuDashboard() {
   const [chartError, setChartError] = useState<string | null>(null);
   const [chartMetric, setChartMetric] = useState<'qty' | 'amount'>('qty');
   const [amountTotals, setAmountTotals] = useState<{ currentAmount: number; previousAmount: number } | null>(null);
+  const [moveSummary, setMoveSummary] = useState<{ current: Record<string, number>; previous: Record<string, number> } | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [previousPage, setPreviousPage] = useState(1);
@@ -175,6 +174,7 @@ export function ProductSkuDashboard() {
   const [previousPageSize, setPreviousPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [moveTypes, setMoveTypes] = useState<string[]>([]);
 
   const [currentData, setCurrentData] = useState<SkuRawPage | null>(null);
   const [previousData, setPreviousData] = useState<SkuRawPage | null>(null);
@@ -192,10 +192,11 @@ export function ProductSkuDashboard() {
       setChartLoading(true);
       setChartError(null);
       try {
-        const res = await skuApi.getMonthlyComparison();
+        const res = await skuApi.getMonthlyComparison({ moveTypes: moveTypes.length > 0 ? moveTypes : undefined });
         if (!ignore) {
           setChartData(res.data.data.months);
           setAmountTotals(res.data.data.amountTotals ?? null);
+          setMoveSummary(res.data.data.moveSummary ?? null);
         }
       } catch (err) {
         if (!ignore) setChartError(normalizeError(err));
@@ -207,13 +208,14 @@ export function ProductSkuDashboard() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [moveTypes]);
 
   async function loadRaw(period: SkuPeriod, page: number, pageSize: number) {
     const res = await skuApi.getRaw(period, {
       page,
       pageSize,
-      q: debouncedSearch || undefined
+      q: debouncedSearch || undefined,
+      moveTypes: moveTypes.length > 0 ? moveTypes : undefined
     });
     return res.data.data;
   }
@@ -242,7 +244,7 @@ export function ProductSkuDashboard() {
     return () => {
       ignore = true;
     };
-  }, [currentPage, previousPage, currentPageSize, previousPageSize, debouncedSearch]);
+  }, [currentPage, previousPage, currentPageSize, previousPageSize, debouncedSearch, moveTypes]);
 
   const currentTotal = useMemo(
     () => chartData.reduce((sum, m) => sum + (m.currentQty || 0), 0),
@@ -269,7 +271,8 @@ export function ProductSkuDashboard() {
     const first = await skuApi.getRaw(period, {
       page: 1,
       pageSize: 1,
-      q: debouncedSearch || undefined
+      q: debouncedSearch || undefined,
+      moveTypes: moveTypes.length > 0 ? moveTypes : undefined
     });
     const totalRecords = first.data.data.totalRecords;
     const columns = first.data.data.columns;
@@ -280,7 +283,8 @@ export function ProductSkuDashboard() {
       const res = await skuApi.getRaw(period, {
         page,
         pageSize,
-        q: debouncedSearch || undefined
+        q: debouncedSearch || undefined,
+        moveTypes: moveTypes.length > 0 ? moveTypes : undefined
       });
       const chunk = res.data.data.rows.map((row) =>
         columns
@@ -305,7 +309,7 @@ export function ProductSkuDashboard() {
       {/* ── Header ──────────────────────────────── */}
       <header>
         <p className="section-heading">Dashboards</p>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Product SKU</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">SKU - Product &amp; moving</h1>
         <p className="text-sm text-gray-500 dark:text-emerald-400">
           เปรียบเทียบจำนวน SKU ปีปัจจุบันกับปีก่อนหน้า
         </p>
@@ -450,7 +454,38 @@ export function ProductSkuDashboard() {
             className="input w-64"
           />
         </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {['MF', 'MM', 'MS', 'NM'].map((t) => {
+            const active = moveTypes.includes(t);
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  setMoveTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+                  setCurrentPage(1);
+                  setPreviousPage(1);
+                }}
+                className={`chip ${active ? 'chip-active' : ''}`}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
         {tableError && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{tableError}</p>}
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {(['MF', 'MM', 'MS', 'NM'] as const).map((type) => (
+          <MetricBox
+            key={type}
+            label={`${type} SKU`}
+            value={(moveSummary?.current?.[type] ?? 0) + (moveSummary?.previous?.[type] ?? 0)}
+            icon={QtyIcon}
+            color="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+          />
+        ))}
       </section>
 
       {/* ── Data Tables ──────────────────────────── */}
@@ -460,7 +495,6 @@ export function ProductSkuDashboard() {
           caption="Raw table preview"
           data={currentData}
           loading={tableLoading}
-          page={currentPage}
           pageSize={currentPageSize}
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => {
@@ -474,7 +508,6 @@ export function ProductSkuDashboard() {
           caption="Raw table preview"
           data={previousData}
           loading={tableLoading}
-          page={previousPage}
           pageSize={previousPageSize}
           onPageChange={setPreviousPage}
           onPageSizeChange={(size) => {

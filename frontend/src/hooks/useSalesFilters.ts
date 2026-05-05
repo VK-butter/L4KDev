@@ -19,6 +19,7 @@ function getDefaultRange() {
 
 export interface SalesFilters {
   dateRange: [string, string];
+  dateRanges: Array<{ start: string; end: string }>;
   categories: string[];
   statuses: string[];
 }
@@ -30,6 +31,16 @@ export function useSalesFilters() {
   const filters: SalesFilters = useMemo(() => {
     const dateStart = params.get('dateStart') ?? defaults.start;
     const dateEnd = params.get('dateEnd') ?? defaults.end;
+    const dateRanges = (() => {
+      const raw = params.get('dateRanges');
+      if (!raw) return [{ start: dateStart, end: dateEnd }];
+      try {
+        const parsed = JSON.parse(raw) as Array<{ start: string; end: string }>;
+        return Array.isArray(parsed) && parsed.length > 0 ? parsed : [{ start: dateStart, end: dateEnd }];
+      } catch {
+        return [{ start: dateStart, end: dateEnd }];
+      }
+    })();
     const categories = params.get('categories')
       ? params.get('categories')!.split(',').filter(Boolean)
       : [];
@@ -39,6 +50,7 @@ export function useSalesFilters() {
 
     return {
       dateRange: [dateStart, dateEnd],
+      dateRanges,
       categories,
       statuses
     };
@@ -67,9 +79,28 @@ export function useSalesFilters() {
       updateParams((next) => {
         next.set('dateStart', start);
         next.set('dateEnd', end);
+        next.set('dateRanges', JSON.stringify([{ start, end }]));
       });
     },
     [updateParams]
+  );
+
+  const setDateRanges = useCallback(
+    (ranges: Array<{ start: string; end: string }>) => {
+      const safe = ranges.length > 0 ? ranges : [{ start: defaults.start, end: defaults.end }];
+      const filled = safe.filter((r) => r.start && r.end);
+      const sorted = filled
+        .map((r) => (r.start <= r.end ? r : { start: r.end, end: r.start }))
+        .sort((a, b) => a.start.localeCompare(b.start));
+      const start = sorted[0]?.start ?? defaults.start;
+      const end = sorted[sorted.length - 1]?.end ?? defaults.end;
+      updateParams((next) => {
+        next.set('dateStart', start);
+        next.set('dateEnd', end);
+        next.set('dateRanges', JSON.stringify(safe));
+      });
+    },
+    [updateParams, defaults.start, defaults.end]
   );
 
   const setCategories = useCallback(
@@ -101,6 +132,7 @@ export function useSalesFilters() {
   return {
     filters,
     setDateRange,
+    setDateRanges,
     setCategories,
     setStatuses
   };

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import {
@@ -21,7 +21,15 @@ import {
 } from '../services/analyticsApi';
 
 type DatePreset = 'daily' | 'monthly' | 'yearly';
-type FilterState = Required<SalesTargetFilter> & { preset?: DatePreset };
+type FilterState = SalesTargetFilter & {
+  dateStart: string;
+  dateEnd: string;
+  statuses: string[];
+  channels: string[];
+  categories: string[];
+  dateRanges: Array<{ start: string; end: string }>;
+  preset?: DatePreset;
+};
 
 const STATUS_OPTIONS = ['Complete', 'Cancel'];
 
@@ -48,6 +56,38 @@ function getPresetRange(currentEnd: string, preset: DatePreset) {
   else if (preset === 'monthly') start.setDate(1);
   else start.setMonth(0, 1);
   return { dateStart: toIso(start), dateEnd: toIso(end) };
+}
+
+function normalizeDateRanges(ranges: Array<{ start: string; end: string }>) {
+  const valid = ranges
+    .filter((r) => r.start && r.end)
+    .map((r) => (r.start <= r.end ? r : { start: r.end, end: r.start }))
+    .sort((a, b) => a.start.localeCompare(b.start));
+  const merged: Array<{ start: string; end: string }> = [];
+  for (const range of valid) {
+    const prev = merged[merged.length - 1];
+    if (!prev) {
+      merged.push({ ...range });
+      continue;
+    }
+    const prevEnd = new Date(prev.end);
+    prevEnd.setDate(prevEnd.getDate() + 1);
+    if (new Date(range.start) <= prevEnd) {
+      if (range.end > prev.end) prev.end = range.end;
+      continue;
+    }
+    merged.push({ ...range });
+  }
+  return merged;
+}
+
+function resolveDateBounds(ranges: Array<{ start: string; end: string }>, fallback: { dateStart: string; dateEnd: string }) {
+  const normalized = normalizeDateRanges(ranges);
+  if (normalized.length === 0) return fallback;
+  return {
+    dateStart: normalized[0].start,
+    dateEnd: normalized[normalized.length - 1].end
+  };
 }
 
 function toggleValue(items: string[], value: string) {
@@ -548,6 +588,7 @@ export function SalesVsTargetPage() {
   const defaults = useMemo(getDefaultRange, []);
   const [filter, setFilter] = useState<FilterState>({
     ...defaults,
+    dateRanges: [{ start: defaults.dateStart, end: defaults.dateEnd }],
     statuses: [],
     channels: [],
     categories: []
@@ -566,7 +607,21 @@ export function SalesVsTargetPage() {
   const [error, setError] = useState<string | null>(null);
 
   const handleClearFilter = () => {
-    setFilter({ ...getDefaultRange(), statuses: [], channels: [], categories: [], preset: undefined });
+    const next = getDefaultRange();
+    setFilter({ ...next, dateRanges: [{ start: next.dateStart, end: next.dateEnd }], statuses: [], channels: [], categories: [], preset: undefined });
+  };
+
+  const updateDateRanges = (ranges: Array<{ start: string; end: string }>, keepPreset = false) => {
+    setFilter((prev) => {
+      const nextRanges = ranges.length > 0 ? ranges : [{ start: '', end: '' }];
+      const bounds = resolveDateBounds(nextRanges, { dateStart: prev.dateStart, dateEnd: prev.dateEnd });
+      return {
+        ...prev,
+        ...bounds,
+        dateRanges: nextRanges,
+        preset: keepPreset ? prev.preset : undefined
+      };
+    });
   };
 
   const optionsKey = `${filter.dateStart}|${filter.dateEnd}|${filter.statuses.join(',')}`;
@@ -660,7 +715,10 @@ export function SalesVsTargetPage() {
   }, [pivotData]);
 
   const applyPreset = (preset: DatePreset) => {
-    setFilter((prev) => ({ ...prev, ...getPresetRange(prev.dateEnd, preset), preset }));
+    setFilter((prev) => {
+      const next = getPresetRange(prev.dateEnd, preset);
+      return { ...prev, ...next, dateRanges: [{ start: next.dateStart, end: next.dateEnd }], preset };
+    });
   };
 
   const hasChartData = (compareData?.chart ?? []).some(
@@ -709,14 +767,49 @@ export function SalesVsTargetPage() {
           </div>
         </div>
 
-        {/* Date range */}
-        <div className="grid grid-cols-2 gap-2">
-          <input type="date" value={filter.dateStart}
-            onChange={(e) => setFilter({ ...filter, dateStart: e.target.value, preset: undefined })}
-            className="input py-1.5 text-xs" />
-          <input type="date" value={filter.dateEnd}
-            onChange={(e) => setFilter({ ...filter, dateEnd: e.target.value, preset: undefined })}
-            className="input py-1.5 text-xs" />
+        {/* Date ranges (single mode) */}
+        <div className="space-y-2">
+          {filter.dateRanges.map((range, idx) => (
+            <div key={`dr-${idx}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+              <input
+                type="date"
+                value={range.start}
+                onChange={(e) => {
+                  const next = filter.dateRanges.map((r, i) => (i === idx ? { ...r, start: e.target.value } : r));
+                  updateDateRanges(next);
+                }}
+                className="input py-1.5 text-xs"
+              />
+              <input
+                type="date"
+                value={range.end}
+                onChange={(e) => {
+                  const next = filter.dateRanges.map((r, i) => (i === idx ? { ...r, end: e.target.value } : r));
+                  updateDateRanges(next);
+                }}
+                className="input py-1.5 text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => updateDateRanges(filter.dateRanges.filter((_, i) => i !== idx))}
+                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20 transition-colors"
+              >
+                ลบ
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => updateDateRanges([...filter.dateRanges, { start: '', end: '' }], true)}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-white/80 hover:text-emerald-900 dark:text-emerald-300 dark:hover:bg-white/[0.06]"
+            >
+              + เพิ่มช่วง
+            </button>
+            <p className="text-[10px] text-gray-500 dark:text-emerald-500/90">
+              โหมดเดียว: เพิ่มได้หลายช่วงวัน (รวมช่วงเดียวได้)
+            </p>
+          </div>
         </div>
 
         {/* Status */}

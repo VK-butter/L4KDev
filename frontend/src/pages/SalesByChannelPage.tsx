@@ -19,7 +19,13 @@ import {
   type VsStageFilter
 } from '../services/analyticsApi';
 
-type StageState = Required<VsStageFilter> & { preset?: DatePreset };
+type DateStageState = {
+  dateStart: string;
+  dateEnd: string;
+  dateRanges: Array<{ start: string; end: string }>;
+  preset?: DatePreset;
+};
+type SharedDimensionFilters = { statuses: string[]; channels: string[]; categories: string[] };
 type DatePreset = 'daily' | 'monthly' | 'yearly';
 
 const STATUS_OPTIONS = ['Complete', 'Cancel'];
@@ -51,6 +57,26 @@ function getPresetRange(currentEnd: string, preset: DatePreset) {
 
 function toggleValue(list: string[], value: string) {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+function mergeVsOptions(a: VsOptionsResponse, b: VsOptionsResponse): VsOptionsResponse {
+  const ch = new Set([...a.channels, ...b.channels]);
+  const cat = new Set([...a.categories, ...b.categories]);
+  return {
+    channels: Array.from(ch).sort((x, y) => x.localeCompare(y, 'th')),
+    categories: Array.from(cat).sort((x, y) => x.localeCompare(y, 'th'))
+  };
+}
+
+function buildVsStage(dates: DateStageState, shared: SharedDimensionFilters): VsStageFilter {
+  return {
+    dateStart: dates.dateStart,
+    dateEnd: dates.dateEnd,
+    dateRanges: dates.dateRanges,
+    statuses: shared.statuses,
+    channels: shared.channels,
+    categories: shared.categories
+  };
 }
 
 function pctLabel(value: number | null) {
@@ -145,12 +171,12 @@ function ChipToggle({ items, selected, onToggle, label }: {
   );
 }
 
-/* ── Compact Stage Filter Panel ─────────────────── */
-function StagePanel({
-  label, color, stage, options, onChange
+/* ── Date range only (per stage) ───────────────── */
+function DateStagePanel({
+  label, color, stage, onChange
 }: {
-  label: string; color: 'emerald' | 'blue'; stage: StageState; options: VsOptionsResponse;
-  onChange: (next: StageState) => void;
+  label: string; color: 'emerald' | 'blue'; stage: DateStageState;
+  onChange: (next: DateStageState) => void;
 }) {
   const accent = color === 'emerald'
     ? 'border-emerald-400 dark:border-emerald-600'
@@ -158,22 +184,23 @@ function StagePanel({
   const dot = color === 'emerald' ? 'bg-emerald-500' : 'bg-blue-500';
 
   const applyPreset = (preset: DatePreset) => {
-    onChange({ ...stage, ...getPresetRange(stage.dateEnd, preset), preset });
+    const next = getPresetRange(stage.dateEnd, preset);
+    onChange({ ...stage, ...next, dateRanges: [{ start: next.dateStart, end: next.dateEnd }], preset });
   };
 
   return (
     <div className={`panel border-l-4 ${accent} space-y-3`}>
-      {/* Header */}
       <div className="flex items-center gap-2">
         <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
         <h3 className="text-sm font-bold text-gray-900 dark:text-white">{label}</h3>
-        {(stage.statuses.length > 0 || stage.channels.length > 0 || stage.categories.length > 0) && (
-          <button type="button"
-            onClick={() => onChange({ ...getDefaultDateRange(), statuses: [], channels: [], categories: [], preset: undefined })}
-            className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20 transition-colors">
-            Clear
-          </button>
-        )}
+        <button type="button"
+          onClick={() => {
+            const next = getDefaultDateRange();
+            onChange({ ...next, dateRanges: [{ start: next.dateStart, end: next.dateEnd }], preset: undefined });
+          }}
+          className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20 transition-colors">
+          รีเซ็ตวัน
+        </button>
         <div className="ml-auto flex gap-1">
           {(['daily', 'monthly', 'yearly'] as DatePreset[]).map((p) => {
             const isActive = stage.preset === p;
@@ -191,24 +218,103 @@ function StagePanel({
         </div>
       </div>
 
-      {/* Date range */}
-      <div className="grid grid-cols-2 gap-2">
-        <input type="date" value={stage.dateStart}
-          onChange={(e) => onChange({ ...stage, dateStart: e.target.value, preset: undefined })}
-          className="input py-1.5 text-xs" />
-        <input type="date" value={stage.dateEnd}
-          onChange={(e) => onChange({ ...stage, dateEnd: e.target.value, preset: undefined })}
-          className="input py-1.5 text-xs" />
+      <div className="space-y-2">
+        {stage.dateRanges.map((range, idx) => (
+          <div key={`${label}-r-${idx}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+            <input
+              type="date"
+              value={range.start}
+              onChange={(e) => {
+                const nextRanges = stage.dateRanges.map((r, i) => (i === idx ? { ...r, start: e.target.value } : r));
+                const filled = nextRanges.filter((r) => r.start && r.end);
+                const sorted = filled
+                  .map((r) => (r.start <= r.end ? r : { start: r.end, end: r.start }))
+                  .sort((a, b) => a.start.localeCompare(b.start));
+                const dateStart = sorted[0]?.start ?? stage.dateStart;
+                const dateEnd = sorted[sorted.length - 1]?.end ?? stage.dateEnd;
+                onChange({ ...stage, dateStart, dateEnd, dateRanges: nextRanges, preset: undefined });
+              }}
+              className="input py-1.5 text-xs"
+            />
+            <input
+              type="date"
+              value={range.end}
+              onChange={(e) => {
+                const nextRanges = stage.dateRanges.map((r, i) => (i === idx ? { ...r, end: e.target.value } : r));
+                const filled = nextRanges.filter((r) => r.start && r.end);
+                const sorted = filled
+                  .map((r) => (r.start <= r.end ? r : { start: r.end, end: r.start }))
+                  .sort((a, b) => a.start.localeCompare(b.start));
+                const dateStart = sorted[0]?.start ?? stage.dateStart;
+                const dateEnd = sorted[sorted.length - 1]?.end ?? stage.dateEnd;
+                onChange({ ...stage, dateStart, dateEnd, dateRanges: nextRanges, preset: undefined });
+              }}
+              className="input py-1.5 text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const nextRanges = stage.dateRanges.filter((_, i) => i !== idx);
+                const safe = nextRanges.length > 0 ? nextRanges : [{ start: '', end: '' }];
+                const filled = safe.filter((r) => r.start && r.end);
+                const sorted = filled
+                  .map((r) => (r.start <= r.end ? r : { start: r.end, end: r.start }))
+                  .sort((a, b) => a.start.localeCompare(b.start));
+                const dateStart = sorted[0]?.start ?? stage.dateStart;
+                const dateEnd = sorted[sorted.length - 1]?.end ?? stage.dateEnd;
+                onChange({ ...stage, dateStart, dateEnd, dateRanges: safe, preset: undefined });
+              }}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20"
+            >
+              ลบ
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange({ ...stage, dateRanges: [...stage.dateRanges, { start: '', end: '' }], preset: undefined })}
+          className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-white/80 hover:text-emerald-900 dark:text-emerald-300 dark:hover:bg-white/[0.06]"
+        >
+          + เพิ่มช่วง
+        </button>
       </div>
+    </div>
+  );
+}
 
-      {/* Status */}
+/* ── Shared dimension filters (both stages) ─────── */
+function SharedFiltersPanel({
+  options, filters, onChange
+}: {
+  options: VsOptionsResponse; filters: SharedDimensionFilters;
+  onChange: (next: SharedDimensionFilters) => void;
+}) {
+  const hasDim =
+    filters.statuses.length > 0 || filters.channels.length > 0 || filters.categories.length > 0;
+  return (
+    <div className="panel border-l-4 border-violet-400 dark:border-violet-600 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full bg-violet-500" />
+        <h3 className="text-sm font-bold text-gray-900 dark:text-white">ตัวกรองร่วม</h3>
+        {hasDim && (
+          <button type="button"
+            onClick={() => onChange({ statuses: [], channels: [], categories: [] })}
+            className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20 transition-colors">
+            ล้างตัวกรอง
+          </button>
+        )}
+      </div>
+      <p className="text-[10px] leading-snug text-gray-500 dark:text-emerald-500/90">
+        Status · ช่องทาง · หมวดสินค้า — ใช้ชุดเดียวกับทั้ง Stage A และ B (รายการหมวด/ช่องทางรวมจากทั้งสองช่วงวัน; ฝั่งที่ไม่มีข้อมูลจะได้ 0)
+      </p>
+
       <div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">Status</p>
         <div className="flex gap-1.5">
           {STATUS_OPTIONS.map((s) => {
-            const active = stage.statuses.includes(s);
+            const active = filters.statuses.includes(s);
             return (
-              <button key={s} type="button" onClick={() => onChange({ ...stage, statuses: toggleValue(stage.statuses, s) })}
+              <button key={s} type="button" onClick={() => onChange({ ...filters, statuses: toggleValue(filters.statuses, s) })}
                 className={`chip ${active ? 'chip-active' : ''}`}>
                 {active && <svg className="inline -ml-0.5 mr-0.5 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
                 {s}
@@ -218,18 +324,16 @@ function StagePanel({
         </div>
       </div>
 
-      {/* Channel chips */}
       <div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">ช่องทาง</p>
-        <ChipToggle items={options.channels} selected={stage.channels}
-          onToggle={(v) => onChange({ ...stage, channels: toggleValue(stage.channels, v) })} label="channels" />
+        <ChipToggle items={options.channels} selected={filters.channels}
+          onToggle={(v) => onChange({ ...filters, channels: toggleValue(filters.channels, v) })} label="channels" />
       </div>
 
-      {/* Category chips */}
       <div>
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-emerald-500">หมวดสินค้า</p>
-        <ChipToggle items={options.categories} selected={stage.categories}
-          onToggle={(v) => onChange({ ...stage, categories: toggleValue(stage.categories, v) })} label="categories" />
+        <ChipToggle items={options.categories} selected={filters.categories}
+          onToggle={(v) => onChange({ ...filters, categories: toggleValue(filters.categories, v) })} label="categories" />
       </div>
     </div>
   );
@@ -520,11 +624,30 @@ function buildPivotSheet(data: VsPivotResponse, label: string, metric: 'revenue'
    ════════════════════════════════════════════════════ */
 export function SalesByChannelPage() {
   const defaults = useMemo(getDefaultDateRange, []);
-  const [stageA, setStageA] = useState<StageState>({ ...defaults, statuses: [], channels: [], categories: [] });
-  const [stageB, setStageB] = useState<StageState>({ ...defaults, statuses: [], channels: [], categories: [] });
+  const [stageADates, setStageADates] = useState<DateStageState>({
+    ...defaults,
+    dateRanges: [{ start: defaults.dateStart, end: defaults.dateEnd }]
+  });
+  const [stageBDates, setStageBDates] = useState<DateStageState>({
+    ...defaults,
+    dateRanges: [{ start: defaults.dateStart, end: defaults.dateEnd }]
+  });
+  const [sharedFilters, setSharedFilters] = useState<SharedDimensionFilters>({
+    statuses: [],
+    channels: [],
+    categories: []
+  });
 
-  const [optionsA, setOptionsA] = useState<VsOptionsResponse>({ channels: [], categories: [] });
-  const [optionsB, setOptionsB] = useState<VsOptionsResponse>({ channels: [], categories: [] });
+  const stageAForApi = useMemo(
+    () => buildVsStage(stageADates, sharedFilters),
+    [stageADates, sharedFilters]
+  );
+  const stageBForApi = useMemo(
+    () => buildVsStage(stageBDates, sharedFilters),
+    [stageBDates, sharedFilters]
+  );
+
+  const [sharedOptions, setSharedOptions] = useState<VsOptionsResponse>({ channels: [], categories: [] });
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [compareData, setCompareData] = useState<VsCompareResponse | null>(null);
@@ -536,30 +659,39 @@ export function SalesByChannelPage() {
   const [pivotOpen, setPivotOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const optionsKeyA = `${stageA.dateStart}|${stageA.dateEnd}|${stageA.statuses.join(',')}`;
-  const optionsKeyB = `${stageB.dateStart}|${stageB.dateEnd}|${stageB.statuses.join(',')}`;
+  const optionsReloadKey = [
+    stageADates.dateStart,
+    stageADates.dateEnd,
+    stageBDates.dateStart,
+    stageBDates.dateEnd,
+    sharedFilters.statuses.join(',')
+  ].join('|');
 
   useEffect(() => {
     let ignore = false;
     async function loadOptions() {
       setLoadingOptions(true);
       try {
+        const statusPayload = sharedFilters.statuses;
         const [a, b] = await Promise.all([
-          analyticsVsApi.getVsOptions({ dateStart: stageA.dateStart, dateEnd: stageA.dateEnd, statuses: stageA.statuses }),
-          analyticsVsApi.getVsOptions({ dateStart: stageB.dateStart, dateEnd: stageB.dateEnd, statuses: stageB.statuses })
+          analyticsVsApi.getVsOptions({
+            dateStart: stageADates.dateStart,
+            dateEnd: stageADates.dateEnd,
+            statuses: statusPayload
+          }),
+          analyticsVsApi.getVsOptions({
+            dateStart: stageBDates.dateStart,
+            dateEnd: stageBDates.dateEnd,
+            statuses: statusPayload
+          })
         ]);
         if (ignore) return;
-        setOptionsA(a.data.data);
-        setOptionsB(b.data.data);
-        setStageA((prev) => ({
+        const merged = mergeVsOptions(a.data.data, b.data.data);
+        setSharedOptions(merged);
+        setSharedFilters((prev) => ({
           ...prev,
-          channels: prev.channels.filter((ch) => a.data.data.channels.includes(ch)),
-          categories: prev.categories.filter((cg) => a.data.data.categories.includes(cg))
-        }));
-        setStageB((prev) => ({
-          ...prev,
-          channels: prev.channels.filter((ch) => b.data.data.channels.includes(ch)),
-          categories: prev.categories.filter((cg) => b.data.data.categories.includes(cg))
+          channels: prev.channels.filter((ch) => merged.channels.includes(ch)),
+          categories: prev.categories.filter((cg) => merged.categories.includes(cg))
         }));
       } catch (e) {
         if (!ignore) setError(e instanceof Error ? e.message : 'Failed to load filter options');
@@ -569,7 +701,7 @@ export function SalesByChannelPage() {
     }
     loadOptions();
     return () => { ignore = true; };
-  }, [optionsKeyA, optionsKeyB, stageA.dateStart, stageA.dateEnd, stageB.dateStart, stageB.dateEnd, stageA.statuses, stageB.statuses]);
+  }, [optionsReloadKey]);
 
   useEffect(() => {
     let ignore = false;
@@ -577,7 +709,7 @@ export function SalesByChannelPage() {
       setLoadingCompare(true);
       setError(null);
       try {
-        const result = await analyticsVsApi.compareVs({ stageA, stageB });
+        const result = await analyticsVsApi.compareVs({ stageA: stageAForApi, stageB: stageBForApi });
         if (!ignore) setCompareData(result.data.data);
       } catch (e) {
         if (!ignore) setError(e instanceof Error ? e.message : 'Failed to compare');
@@ -587,7 +719,7 @@ export function SalesByChannelPage() {
     }
     loadCompare();
     return () => { ignore = true; };
-  }, [JSON.stringify(stageA), JSON.stringify(stageB)]);
+  }, [stageAForApi, stageBForApi]);
 
   // Load pivot data — lazy: only when section is open
   useEffect(() => {
@@ -597,8 +729,8 @@ export function SalesByChannelPage() {
       setLoadingPivot(true);
       try {
         const [a, b] = await Promise.all([
-          analyticsVsApi.getPivot(stageA, 'daily'),
-          analyticsVsApi.getPivot(stageB, 'daily')
+          analyticsVsApi.getPivot(stageAForApi, 'daily'),
+          analyticsVsApi.getPivot(stageBForApi, 'daily')
         ]);
         if (!ignore) {
           setPivotA(a.data.data);
@@ -612,7 +744,7 @@ export function SalesByChannelPage() {
     }
     loadPivots();
     return () => { ignore = true; };
-  }, [pivotOpen, JSON.stringify(stageA), JSON.stringify(stageB)]);
+  }, [pivotOpen, stageAForApi, stageBForApi]);
 
   const handleExportExcel = useCallback(() => {
     if (!pivotA || !pivotB) return;
@@ -623,8 +755,8 @@ export function SalesByChannelPage() {
     XLSX.utils.book_append_sheet(wb, wsB, 'Stage B');
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `รายงานการขาย_${stageA.dateStart}_to_${stageA.dateEnd}.xlsx`);
-  }, [pivotA, pivotB, pivotMetric, stageA.dateStart, stageA.dateEnd]);
+    saveAs(blob, `รายงานการขาย_${stageAForApi.dateStart}_to_${stageAForApi.dateEnd}.xlsx`);
+  }, [pivotA, pivotB, pivotMetric, stageAForApi.dateStart, stageAForApi.dateEnd]);
 
   const loading = loadingOptions || loadingCompare;
 
@@ -641,11 +773,12 @@ export function SalesByChannelPage() {
         </p>
       </header>
 
-      {/* ── Stage Filters (side by side) ────────── */}
+      {/* ── Date ranges + shared filters ─────────── */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <StagePanel label="Stage A" color="emerald" stage={stageA} options={optionsA} onChange={setStageA} />
-        <StagePanel label="Stage B" color="blue" stage={stageB} options={optionsB} onChange={setStageB} />
+        <DateStagePanel label="Stage A — ช่วงวัน" color="emerald" stage={stageADates} onChange={setStageADates} />
+        <DateStagePanel label="Stage B — ช่วงวัน" color="blue" stage={stageBDates} onChange={setStageBDates} />
       </div>
+      <SharedFiltersPanel options={sharedOptions} filters={sharedFilters} onChange={setSharedFilters} />
 
       {/* ── Loading / Error ─────────────────────── */}
       {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
@@ -864,7 +997,7 @@ export function SalesByChannelPage() {
             <div>
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-emerald-400">
                 <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" /> Stage A
-                <span className="ml-1 text-gray-400 dark:text-gray-500 font-normal">({stageA.dateStart} — {stageA.dateEnd})</span>
+                <span className="ml-1 text-gray-400 dark:text-gray-500 font-normal">({stageAForApi.dateStart} — {stageAForApi.dateEnd})</span>
               </p>
               {pivotA ? <PivotTable data={pivotA} metric={pivotMetric} /> : <p className="text-xs text-gray-400">No data</p>}
             </div>
@@ -872,7 +1005,7 @@ export function SalesByChannelPage() {
             <div>
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-emerald-400">
                 <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500" /> Stage B
-                <span className="ml-1 text-gray-400 dark:text-gray-500 font-normal">({stageB.dateStart} — {stageB.dateEnd})</span>
+                <span className="ml-1 text-gray-400 dark:text-gray-500 font-normal">({stageBForApi.dateStart} — {stageBForApi.dateEnd})</span>
               </p>
               {pivotB ? <PivotTable data={pivotB} metric={pivotMetric} /> : <p className="text-xs text-gray-400">No data</p>}
             </div>

@@ -16,7 +16,7 @@ import { RawDbPreview } from '../components/analytics/RawDbPreview';
 const STATUS_OPTIONS = ['Pending', 'Fulfilled', 'Cancelled'];
 
 export function DashboardHome() {
-  const { filters, setDateRange, setCategories, setStatuses } = useSalesFilters();
+  const { filters, setDateRange, setDateRanges, setCategories, setStatuses } = useSalesFilters();
   const categoriesKey = filters.categories.join('|');
   const statusesKey = filters.statuses.join('|');
 
@@ -43,9 +43,9 @@ export function DashboardHome() {
       setSummaryError(null);
       try {
         const [summaryRes, categoryRes, trendRes] = await Promise.all([
-          analyticsApi.summary({ dateStart, dateEnd, categories: filters.categories, statuses: filters.statuses }),
-          analyticsApi.byCategory({ dateStart, dateEnd, categories: filters.categories, statuses: filters.statuses }),
-          analyticsApi.timeseries({ dateStart, dateEnd, categories: filters.categories, statuses: filters.statuses })
+          analyticsApi.summary({ dateStart, dateEnd, dateRanges: filters.dateRanges, categories: filters.categories, statuses: filters.statuses }),
+          analyticsApi.byCategory({ dateStart, dateEnd, dateRanges: filters.dateRanges, categories: filters.categories, statuses: filters.statuses }),
+          analyticsApi.timeseries({ dateStart, dateEnd, dateRanges: filters.dateRanges, categories: filters.categories, statuses: filters.statuses })
         ]);
         if (abort.signal.aborted) return;
         setSummary(summaryRes.data.data);
@@ -82,7 +82,7 @@ export function DashboardHome() {
       setDrilldownLoading(true);
       try {
         const { data } = await analyticsApi.drilldown({
-          dateStart, dateEnd,
+          dateStart, dateEnd, dateRanges: filters.dateRanges,
           categories: filters.categories,
           statuses: filters.statuses,
           category: selectedCategory ?? undefined,
@@ -116,6 +116,16 @@ export function DashboardHome() {
     }
   };
 
+  const updateDateRangeRow = (index: number, patch: { start?: string; end?: string }) => {
+    const next = filters.dateRanges.map((r, i) => (i === index ? { ...r, ...patch } : r));
+    setDateRanges(next);
+  };
+
+  const removeDateRangeRow = (index: number) => {
+    const next = filters.dateRanges.filter((_, i) => i !== index);
+    setDateRanges(next);
+  };
+
   const statusFilterDescription = useMemo(
     () => filters.statuses.length === 0 ? 'All' : filters.statuses.join(', '),
     [filters.statuses]
@@ -138,15 +148,31 @@ export function DashboardHome() {
           <p className="text-sm font-semibold text-gray-700 dark:text-emerald-200">Filters</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <label className="section-heading">Start Date</label>
-            <input type="date" value={dateStart} data-testid="filter-date-start"
-              onChange={(e) => setDateRange(e.target.value, dateEnd)} className="input" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="section-heading">End Date</label>
-            <input type="date" value={dateEnd} data-testid="filter-date-end"
-              onChange={(e) => setDateRange(dateStart, e.target.value)} className="input" />
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className="section-heading">Date Ranges</label>
+            <div className="space-y-2">
+              {filters.dateRanges.map((range, idx) => (
+                <div key={`dash-range-${idx}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                  <input type="date" value={range.start} data-testid="filter-date-start"
+                    onChange={(e) => updateDateRangeRow(idx, { start: e.target.value })} className="input" />
+                  <input type="date" value={range.end} data-testid="filter-date-end"
+                    onChange={(e) => updateDateRangeRow(idx, { end: e.target.value })} className="input" />
+                  <button type="button" onClick={() => removeDateRangeRow(idx)} className="btn-sm btn-outline">Remove</button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDateRanges([...filters.dateRanges, { start: dateStart, end: dateEnd }])}
+                  className="btn-sm btn-outline"
+                >
+                  Add Range
+                </button>
+                <button type="button" onClick={() => setDateRange(dateStart, dateEnd)} className="btn-sm btn-outline">
+                  Use Single Range
+                </button>
+              </div>
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="section-heading">Categories</label>

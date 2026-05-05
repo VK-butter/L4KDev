@@ -70,7 +70,7 @@ export function Sidebar({ user }: SidebarProps) {
         { label: 'ยอดขายรายช่องทาง VS', to: '/dashboards/sales-by-channel', icon: <UsersIcon /> },
         { label: 'ยอดขาย VS เป้า', to: '/dashboards/sales-vs-target', icon: <TargetIcon /> },
         { label: 'Inventory', icon: <BoxIcon /> },
-        { label: 'Product SKU', to: '/dashboards/product-sku', icon: <TagIcon /> }
+        { label: 'SKU - Product & moving', to: '/dashboards/product-sku', icon: <TagIcon /> }
       ]
     },
     {
@@ -115,7 +115,7 @@ export function Sidebar({ user }: SidebarProps) {
           <ul className="space-y-1" role="list">
             {group.items.map((item) => {
               const isActive = 'to' in item && location.pathname + location.search === item.to;
-              const baseClass = `flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`;
+              const baseClass = `flex w-full min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400`;
               const activeClass = 'border-emerald-400 bg-white text-[var(--app-accent-ink)] shadow-sm dark:border-emerald-600/60 dark:bg-emerald-950/60 dark:text-emerald-200';
               const inactiveClass = 'border-transparent text-[var(--app-muted-text)] hover:border-emerald-200/80 hover:bg-white/70 hover:text-[var(--app-text)] dark:hover:border-emerald-800/60 dark:hover:bg-white/[0.06] dark:hover:text-[var(--app-text)]';
               const disabledClass = 'cursor-not-allowed text-[var(--app-muted-text)] opacity-60';
@@ -129,12 +129,12 @@ export function Sidebar({ user }: SidebarProps) {
                       aria-label={item.label}
                       aria-current={isActive ? 'page' : undefined}
                     >
-                      <span className={isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-emerald-500/60 dark:text-emerald-600'}>
+                      <span className={isActive ? 'shrink-0 text-emerald-600 dark:text-emerald-400' : 'shrink-0 text-emerald-500/60 dark:text-emerald-600'}>
                         {item.icon}
                       </span>
-                      {item.label}
+                      <span className="min-w-0 truncate">{item.label}</span>
                       {isActive && (
-                        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+                        <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
                       )}
                     </Link>
                   ) : 'href' in item ? (
@@ -145,8 +145,8 @@ export function Sidebar({ user }: SidebarProps) {
                       className={`${baseClass} ${inactiveClass}`}
                       aria-label={`${item.label} (opens new tab)`}
                     >
-                      <span className="text-emerald-500/60 dark:text-emerald-600">{item.icon}</span>
-                      {item.label}
+                      <span className="shrink-0 text-emerald-500/60 dark:text-emerald-600">{item.icon}</span>
+                      <span className="min-w-0 truncate">{item.label}</span>
                     </a>
                   ) : (
                     <button
@@ -155,9 +155,9 @@ export function Sidebar({ user }: SidebarProps) {
                       aria-label={item.label}
                       disabled
                     >
-                      <span className="opacity-40">{item.icon}</span>
-                      {item.label}
-                      <span className="ml-auto">
+                      <span className="shrink-0 opacity-40">{item.icon}</span>
+                      <span className="min-w-0 truncate">{item.label}</span>
+                      <span className="ml-auto shrink-0">
                         <LockIcon />
                       </span>
                     </button>

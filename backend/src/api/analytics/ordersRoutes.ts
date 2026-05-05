@@ -19,9 +19,74 @@ const isoDateSchema = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), 'Invalid ISO date');
 
+const dateRangeItemSchema = z
+  .object({
+    start: isoDateSchema,
+    end: isoDateSchema
+  })
+  .refine((v) => Date.parse(v.start) <= Date.parse(v.end), 'date range start must be <= end');
+
+const dateRangesBodySchema = z.array(dateRangeItemSchema).optional();
+const dateRangesQuerySchema = z.preprocess((value) => {
+  if (typeof value !== 'string' || value.trim().length === 0) return [];
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}, z.array(dateRangeItemSchema).optional().default([]));
+
+type DateRangeItem = z.infer<typeof dateRangeItemSchema>;
+
+function normalizeDateRanges(
+  dateRanges: DateRangeItem[],
+  dateStart?: string,
+  dateEnd?: string
+) {
+  const base = dateRanges.length > 0
+    ? [...dateRanges]
+    : dateStart && dateEnd
+      ? [{ start: dateStart, end: dateEnd }]
+      : [];
+  const sorted = base
+    .map((r) => ({ start: r.start, end: r.end }))
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  const merged: Array<{ start: string; end: string }> = [];
+  for (const range of sorted) {
+    const prev = merged[merged.length - 1];
+    if (!prev) {
+      merged.push(range);
+      continue;
+    }
+    if (Date.parse(range.start) <= Date.parse(prev.end) + 24 * 60 * 60 * 1000) {
+      if (Date.parse(range.end) > Date.parse(prev.end)) prev.end = range.end;
+      continue;
+    }
+    merged.push(range);
+  }
+  return merged;
+}
+
+function buildDateRangesPredicate(
+  dateExpr: string,
+  params: Array<string | number | string[]>,
+  dateRanges: Array<{ start: string; end: string }>
+) {
+  if (dateRanges.length === 0) return '';
+  const chunks = dateRanges.map((range) => {
+    const startIdx = params.length + 1;
+    params.push(range.start);
+    const endIdx = params.length + 1;
+    params.push(range.end);
+    return `(${dateExpr}::date BETWEEN $${startIdx} AND $${endIdx})`;
+  });
+  return `(${chunks.join(' OR ')})`;
+}
+
 const baseFiltersSchema = z.object({
-  dateStart: isoDateSchema,
-  dateEnd: isoDateSchema,
+  dateStart: isoDateSchema.optional(),
+  dateEnd: isoDateSchema.optional(),
+  dateRanges: dateRangesQuerySchema,
   categories: z
     .string()
     .optional()
@@ -50,8 +115,9 @@ const drilldownSchema = baseFiltersSchema.extend({
 });
 
 const vsStageFilterSchema = z.object({
-  dateStart: isoDateSchema,
-  dateEnd: isoDateSchema,
+  dateStart: isoDateSchema.optional(),
+  dateEnd: isoDateSchema.optional(),
+  dateRanges: dateRangesBodySchema,
   statuses: z.array(z.string()).optional().default([]),
   channels: z.array(z.string()).optional().default([]),
   categories: z.array(z.string()).optional().default([])
@@ -63,8 +129,9 @@ const vsCompareSchema = z.object({
 });
 
 const salesTargetFilterSchema = z.object({
-  dateStart: isoDateSchema,
-  dateEnd: isoDateSchema,
+  dateStart: isoDateSchema.optional(),
+  dateEnd: isoDateSchema.optional(),
+  dateRanges: dateRangesBodySchema,
   statuses: z.array(z.string()).optional().default([]),
   channels: z.array(z.string()).optional().default([]),
   categories: z.array(z.string()).optional().default([])
@@ -145,24 +212,6 @@ function normalizeKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9\u0e00-\u0e7f]/g, '');
 }
 
-function parseMonth(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const n = Math.round(value);
-    return n >= 1 && n <= 12 ? n : null;
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    const n = Number(trimmed);
-    if (Number.isFinite(n) && n >= 1 && n <= 12) return Math.round(n);
-    const norm = normalizeKey(trimmed);
-    const match = MONTH_ALIASES.find((m) =>
-      m.tokens.some((t) => norm === t || norm.endsWith(t) || norm.includes(t))
-    );
-    if (match) return match.idx;
-  }
-  return null;
-}
-
 type MonthLayout =
   | {
       type: 'columns';
@@ -170,6 +219,8 @@ type MonthLayout =
     }
   | { type: 'rows'; monthColumn: string; qtyColumn?: string; amountColumn?: string }
   | null;
+
+type MoveRule = { moveType: string; monthStart: number; monthEnd: number };
 
 function isQtyLike(name: string) {
   const norm = normalizeKey(name);
@@ -242,64 +293,74 @@ function detectMonthLayout(fields: FieldDef[]): MonthLayout {
   return null;
 }
 
-async function loadMonthTotals(client: PoolClient, table: string) {
-  const sample = await client.query(`SELECT * FROM ${table} LIMIT 5`);
-  const fields = sample.fields as FieldDef[];
-  const layout = detectMonthLayout(fields);
-  if (!layout) return [];
+function buildMonthsSoldExprFromLayout(layout: MonthLayout, tableAlias = 't') {
+  if (!layout || layout.type !== 'columns') return null;
+  const monthSignals = layout.monthColumns
+    .map((m) => m.qtyColumn ?? m.amountColumn)
+    .filter((c): c is string => Boolean(c));
+  if (monthSignals.length === 0) return null;
+  const bits = monthSignals.map((col) =>
+    `CASE WHEN COALESCE(CAST(${tableAlias}.${quoteIdent(col)} AS numeric), 0) > 0 THEN 1 ELSE 0 END`
+  );
+  return bits.join(' + ');
+}
 
-  if (layout.type === 'columns') {
-    const selectParts: string[] = [];
-    for (const m of layout.monthColumns) {
-      const qtyAlias = quoteIdent(`qty_${m.monthIndex}`);
-      const amtAlias = quoteIdent(`amt_${m.monthIndex}`);
-      selectParts.push(
-        m.qtyColumn
-          ? `SUM(${quoteIdent(m.qtyColumn)})::numeric AS ${qtyAlias}`
-          : `0::numeric AS ${qtyAlias}`
-      );
-      selectParts.push(
-        m.amountColumn
-          ? `SUM(${quoteIdent(m.amountColumn)})::numeric AS ${amtAlias}`
-          : `0::numeric AS ${amtAlias}`
-      );
-    }
-    const sql = `SELECT ${selectParts.join(', ')} FROM ${table}`;
-    const res = await client.query(sql);
-    const row = res.rows[0] ?? {};
-    return layout.monthColumns.map((m) => {
-      const qtyKey = `qty_${m.monthIndex}`;
-      const amtKey = `amt_${m.monthIndex}`;
-      const quantity = row[qtyKey] !== undefined ? Number(row[qtyKey]) : 0;
-      const amount = row[amtKey] !== undefined ? Number(row[amtKey]) : 0;
-      return {
-        monthIndex: m.monthIndex,
-        label: monthLabel(m.monthIndex),
-        quantity,
-        amount
-      };
-    });
-  }
+function buildMoveTypeCaseExpr(monthsSoldExpr: string, rules: MoveRule[]) {
+  const normalized = rules
+    .map((r) => ({
+      moveType: String(r.moveType ?? '').trim().toUpperCase(),
+      monthStart: Number(r.monthStart),
+      monthEnd: Number(r.monthEnd)
+    }))
+    .filter((r) => r.moveType && Number.isFinite(r.monthStart) && Number.isFinite(r.monthEnd))
+    .sort((a, b) => a.monthStart - b.monthStart);
+  if (normalized.length === 0) return `'NM'`;
+  const whenParts = normalized
+    .map((r) => `WHEN ${monthsSoldExpr} BETWEEN ${Math.floor(r.monthStart)} AND ${Math.floor(r.monthEnd)} THEN '${r.moveType.replace(/'/g, "''")}'`)
+    .join(' ');
+  return `CASE ${whenParts} ELSE 'NM' END`;
+}
 
-  const monthCol = quoteIdent(layout.monthColumn);
-  const qtyCol = layout.qtyColumn ? quoteIdent(layout.qtyColumn) : null;
-  const amtCol = layout.amountColumn ? quoteIdent(layout.amountColumn) : null;
-  const selectBits = [`${monthCol} AS month_value`];
-  if (qtyCol) selectBits.push(`SUM(${qtyCol})::numeric AS qty`);
-  if (amtCol) selectBits.push(`SUM(${amtCol})::numeric AS amt`);
-  const sql = `SELECT ${selectBits.join(', ')} FROM ${table} GROUP BY 1`;
-  const res = await client.query(sql);
-  return res.rows.map((r) => {
-    const idx = parseMonth(r.month_value);
-    const quantity = Number(r.qty ?? 0);
-    const amount = Number(r.amt ?? 0);
-    return {
-      monthIndex: idx,
-      label: idx ? monthLabel(idx) : String(r.month_value ?? ''),
-      quantity,
-      amount
-    };
+async function loadConditionSkuRules(client: PoolClient, year: number): Promise<MoveRule[]> {
+  const tablesRes = await client.query(`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'l4k_model' AND table_type = 'BASE TABLE'
+  `);
+  const tableName = (tablesRes.rows as Array<{ table_name: string }>).map((r) => r.table_name).find((t) => {
+    const n = normalizeKey(t);
+    return n.includes('condition') && n.includes('sku');
   });
+  if (!tableName) return [];
+  const sample = await client.query(`SELECT * FROM l4k_model.${quoteIdent(tableName)} LIMIT 0`);
+  const fields = (sample.fields as FieldDef[]).map((f) => f.name);
+  const pick = (cands: string[]) =>
+    fields.find((f) => cands.some((c) => normalizeKey(f) === normalizeKey(c) || normalizeKey(f).includes(normalizeKey(c))));
+  const yearCol = pick(['year', 'ปี']);
+  const startCol = pick(['month_start', 'monthstart', 'start_month', 'month_from', 'min_month']);
+  const endCol = pick(['month_end', 'monthend', 'end_month', 'month_to', 'max_month']);
+  const typeCol = pick(['criteria', 'move_type', 'type', 'condition']);
+  if (!yearCol || !startCol || !endCol || !typeCol) return [];
+  const sql = `
+    SELECT
+      ${quoteIdent(typeCol)} AS move_type,
+      ${quoteIdent(startCol)} AS month_start,
+      ${quoteIdent(endCol)} AS month_end
+    FROM l4k_model.${quoteIdent(tableName)}
+    WHERE NULLIF(TRIM(CAST(${quoteIdent(yearCol)} AS text)), '') ~ '^\\d+$'
+      AND CAST(NULLIF(TRIM(CAST(${quoteIdent(yearCol)} AS text)), '') AS int) = $1
+      AND NULLIF(TRIM(CAST(${quoteIdent(startCol)} AS text)), '') ~ '^\\d+$'
+      AND NULLIF(TRIM(CAST(${quoteIdent(endCol)} AS text)), '') ~ '^\\d+$'
+    ORDER BY
+      CAST(NULLIF(TRIM(CAST(${quoteIdent(startCol)} AS text)), '') AS int),
+      CAST(NULLIF(TRIM(CAST(${quoteIdent(endCol)} AS text)), '') AS int)
+  `;
+  const res = await client.query(sql, [year]);
+  return res.rows.map((r) => ({
+    moveType: String(r.move_type ?? '').trim().toUpperCase(),
+    monthStart: Number(r.month_start ?? 0),
+    monthEnd: Number(r.month_end ?? 0)
+  }));
 }
 
 function mergeMonthTotals(
@@ -345,19 +406,20 @@ function mergeMonthTotals(
   }));
 }
 
-function detectAmountField(fields: FieldDef[]): string | null {
-  const match = fields.find((f) => isAmountLike(f.name));
-  return match ? match.name : null;
-}
-
-async function sumAmountColumn(client: PoolClient, table: string) {
-  const sample = await client.query(`SELECT * FROM ${table} LIMIT 1`);
-  const fields = sample.fields as FieldDef[];
-  const amountField = detectAmountField(fields);
-  if (!amountField) return null;
-  const sql = `SELECT SUM(${quoteIdent(amountField)})::numeric AS total FROM ${table}`;
-  const res = await client.query(sql);
-  return res.rows[0]?.total !== undefined ? Number(res.rows[0].total) : null;
+function detectTotalAmountField(fields: FieldDef[], layout: MonthLayout): string | null {
+  const blocked = new Set<string>();
+  if (layout?.type === 'columns') {
+    for (const m of layout.monthColumns) {
+      if (m.qtyColumn) blocked.add(m.qtyColumn);
+      if (m.amountColumn) blocked.add(m.amountColumn);
+    }
+  } else if (layout?.type === 'rows') {
+    blocked.add(layout.monthColumn);
+    if (layout.qtyColumn) blocked.add(layout.qtyColumn);
+    if (layout.amountColumn) blocked.add(layout.amountColumn);
+  }
+  const candidate = fields.find((f) => !blocked.has(f.name) && isAmountLike(f.name));
+  return candidate ? candidate.name : null;
 }
 
 type VsStageFilter = z.infer<typeof vsStageFilterSchema>;
@@ -437,6 +499,16 @@ function resolveVsColumns(fieldNames: string[]): VsColumns {
   };
 }
 
+/** Exclude product category "ค่าบริการ" from VS analytics (trim + case-insensitive). */
+const VS_EXCLUDED_CATEGORY_LABEL = '\u0e04\u0e48\u0e32\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23';
+
+function vsExcludedCategoryWhereSql(columns: VsColumns, tableAlias = 'j') {
+  if (!columns.category) return '';
+  const col = quoteIdent(columns.category);
+  const esc = VS_EXCLUDED_CATEGORY_LABEL.replace(/'/g, "''");
+  return `AND LOWER(COALESCE(NULLIF(TRIM(CAST(${tableAlias}.${col} AS TEXT)), ''), '')) <> LOWER(TRIM('${esc}'))`;
+}
+
 async function canUseCustomerTypeMap(client: PoolClient) {
   const result = await client.query(`
     SELECT
@@ -458,7 +530,7 @@ function buildVsScopedQuery(
   useCustomerTypeMap: boolean,
   includeDimensionFilters: boolean
 ) {
-  const params: Array<string | string[]> = [stage.dateStart, stage.dateEnd];
+  const params: Array<string | string[]> = [];
   const dateExpr = `j.${quoteIdent(columns.date)}`;
   const orderExpr = columns.order
     ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.order)} AS TEXT)), ''), j.ctid::text)`
@@ -497,7 +569,12 @@ function buildVsScopedQuery(
       ? `COALESCE(NULLIF(TRIM(ct.mapped_type), ''), 'Unknown')`
       : `'Unknown'`;
 
-  const whereParts = [`${dateExpr}::date BETWEEN $1 AND $2`];
+  const whereParts: string[] = [];
+  const dateRanges = normalizeDateRanges(stage.dateRanges ?? [], stage.dateStart, stage.dateEnd);
+  const datePredicate = buildDateRangesPredicate(dateExpr, params, dateRanges);
+  if (datePredicate) whereParts.push(datePredicate);
+  const excludeCatSql = vsExcludedCategoryWhereSql(columns);
+  if (excludeCatSql) whereParts.push(excludeCatSql.replace(/^AND /, ''));
   const normalizedStatuses = normalizeVsStatuses(stage.statuses ?? []);
   if (normalizedStatuses.length > 0) {
     params.push(normalizedStatuses);
@@ -658,7 +735,7 @@ function buildSalesTargetActualScopedQuery(
   useCustomerTypeMap: boolean,
   includeDimensionFilters: boolean
 ) {
-  const params: Array<string | string[]> = [filter.dateStart, filter.dateEnd];
+  const params: Array<string | string[]> = [];
   const dateExpr = `j.${quoteIdent(columns.date)}`;
   const revenueExpr = columns.revenue
     ? `COALESCE(CAST(j.${quoteIdent(columns.revenue)} AS numeric), 0)`
@@ -693,7 +770,10 @@ function buildSalesTargetActualScopedQuery(
       : `'Unknown'`;
   const channelExpr = salesTargetChannelSql(rawChannelExpr);
 
-  const whereParts = [`${dateExpr}::date BETWEEN $1 AND $2`];
+  const whereParts: string[] = [];
+  const dateRanges = normalizeDateRanges(filter.dateRanges ?? [], filter.dateStart, filter.dateEnd);
+  const datePredicate = buildDateRangesPredicate(dateExpr, params, dateRanges);
+  if (datePredicate) whereParts.push(datePredicate);
   const normalizedStatuses = normalizeVsStatuses(filter.statuses ?? []);
   if (normalizedStatuses.length > 0) {
     params.push(normalizedStatuses);
@@ -739,15 +819,24 @@ function buildSalesTargetTargetScopedQuery(
   filter: SalesTargetFilter,
   includeDimensionFilters: boolean
 ) {
-  const params: Array<string | string[]> = [filter.dateStart, filter.dateEnd];
+  const params: Array<string | string[]> = [];
   const monthExpr = `to_date(t.month, 'MM_YYYY')`;
   const rawChannelExpr = `COALESCE(NULLIF(TRIM(CAST(t.channel AS TEXT)), ''), 'Unknown')`;
   const channelExpr = salesTargetChannelSql(rawChannelExpr);
   const categoryExpr = `COALESCE(NULLIF(TRIM(CAST(t.category AS TEXT)), ''), 'Unknown')`;
 
-  const whereParts = [
-    `${monthExpr} BETWEEN date_trunc('month', $1::date)::date AND date_trunc('month', $2::date)::date`
-  ];
+  const whereParts: string[] = [];
+  const dateRanges = normalizeDateRanges(filter.dateRanges ?? [], filter.dateStart, filter.dateEnd);
+  if (dateRanges.length > 0) {
+    const monthChunks = dateRanges.map((range) => {
+      const startIdx = params.length + 1;
+      params.push(range.start);
+      const endIdx = params.length + 1;
+      params.push(range.end);
+      return `(${monthExpr} BETWEEN date_trunc('month', $${startIdx}::date)::date AND date_trunc('month', $${endIdx}::date)::date)`;
+    });
+    whereParts.push(`(${monthChunks.join(' OR ')})`);
+  }
   const filteredParts = ['1=1'];
 
   if (includeDimensionFilters) {
@@ -1018,6 +1107,7 @@ router.get('/orders/raw', async (req, res, next) => {
           .string()
           .optional()
           .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd'),
+        dateRanges: dateRangesQuerySchema,
         status: z.string().optional(),
         q: z.string().optional()
       })
@@ -1065,10 +1155,13 @@ router.get('/orders/raw', async (req, res, next) => {
 
       const parts: string[] = [];
       const params: Array<string | number> = [];
-      if (querySchema.dateStart && querySchema.dateEnd) {
-        parts.push(`(${dateColumn}::date BETWEEN $${params.length + 1} AND $${params.length + 2})`);
-        params.push(querySchema.dateStart, querySchema.dateEnd);
-      }
+      const dateRanges = normalizeDateRanges(
+        querySchema.dateRanges ?? [],
+        querySchema.dateStart,
+        querySchema.dateEnd
+      );
+      const datePredicate = buildDateRangesPredicate(dateColumn, params, dateRanges);
+      if (datePredicate) parts.push(datePredicate);
       if (statusColumn && querySchema.status) {
         parts.push(`${statusColumn} = $${params.length + 1}`);
         params.push(querySchema.status);
@@ -1149,6 +1242,7 @@ router.get('/orders/raw/summary', async (req, res, next) => {
           .string()
           .optional()
           .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd'),
+        dateRanges: dateRangesQuerySchema,
         status: z.string().optional()
       })
       .parse(req.query);
@@ -1207,10 +1301,13 @@ router.get('/orders/raw/summary', async (req, res, next) => {
 
       const filters: string[] = [];
       const params: Array<string | number> = [];
-      if (querySchema.dateStart && querySchema.dateEnd) {
-        filters.push(`(${dateColumn}::date BETWEEN $${params.length + 1} AND $${params.length + 2})`);
-        params.push(querySchema.dateStart as string, querySchema.dateEnd as string);
-      }
+      const dateRanges = normalizeDateRanges(
+        querySchema.dateRanges ?? [],
+        querySchema.dateStart,
+        querySchema.dateEnd
+      );
+      const datePredicate = buildDateRangesPredicate(dateColumn, params, dateRanges);
+      if (datePredicate) filters.push(datePredicate);
       if (querySchema.status) {
         filters.push(`${statusColumn} = $${params.length + 1}`);
         params.push(querySchema.status);
@@ -1253,6 +1350,8 @@ router.get('/orders/raw/status', async (req, res, next) => {
           .string()
           .optional()
           .refine((v) => (v ? !Number.isNaN(Date.parse(v)) : true), 'Invalid dateEnd')
+        ,
+        dateRanges: dateRangesQuerySchema
       })
       .parse(req.query);
 
@@ -1262,41 +1361,82 @@ router.get('/orders/raw/status', async (req, res, next) => {
         'SELECT * FROM l4k_model.joinsales_orderline LIMIT 0'
       );
       const fieldNames = (sample.fields as FieldDef[]).map((f) => f.name);
-      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\u0E00-\u0E7F]/g, '');
+      const columns = resolveVsColumns(fieldNames);
+      const dateCol = quoteIdent(columns.date);
+      const statusCol = quoteIdent(columns.status ?? 'status');
+      const orderKeyExpr = columns.order
+        ? `COALESCE(NULLIF(TRIM(CAST(j.${quoteIdent(columns.order)} AS TEXT)), ''), j.ctid::text)`
+        : 'j.ctid::text';
 
-      // Date col for filter (reuse detection logic)
-      const envDate = process.env.RAW_DATE_COLUMN;
-      let chosenDate = envDate && envDate.trim().length > 0 ? envDate : '';
-      if (!chosenDate) {
-        const exact = fieldNames.find((n) => normalize(n) === 'orderdate');
-        chosenDate = exact ?? fieldNames.find((n) => normalize(n).includes('date')) ?? 'order_date';
-      }
-      const dateColumn = `"${chosenDate.replace(/"/g, '""')}"`;
+      const params: Array<string | number> = [];
+      const dateRanges = normalizeDateRanges(
+        querySchema.dateRanges ?? [],
+        querySchema.dateStart,
+        querySchema.dateEnd
+      );
+      const datePredicate = buildDateRangesPredicate(`j.${dateCol}`, params, dateRanges);
+      const where = datePredicate ? `WHERE ${datePredicate}` : '';
 
-      // Status column detection
-      const envStatus = process.env.RAW_STATUS_COLUMN;
-      const statusCandidates = ['status', 'orderstatus', 'itemstatus', 'saled', 'sale_status', 'สถานะ'];
-      let chosenStatus = envStatus && envStatus.trim().length > 0 ? envStatus : '';
-      if (!chosenStatus) {
-        const match = fieldNames.find((n) => {
-          const key = normalize(n);
-          return statusCandidates.some((c) => key === c || key.includes(c));
-        });
-        chosenStatus = match ?? 'status';
-      }
-      const statusColumn = `"${chosenStatus.replace(/"/g, '""')}"`;
+      const groupSql = `
+        SELECT j.${statusCol} AS status,
+          COUNT(*)::bigint AS cnt,
+          COUNT(DISTINCT ${orderKeyExpr})::bigint AS order_cnt
+        FROM l4k_model.joinsales_orderline j
+        ${where}
+        GROUP BY 1
+      `;
+      const result = await client.query(groupSql, params);
 
-      const hasDateFilter = querySchema.dateStart && querySchema.dateEnd;
-      const where = hasDateFilter ? `WHERE (${dateColumn}::date BETWEEN $1 AND $2)` : '';
-      const params: Array<string | number> = hasDateFilter
-        ? [querySchema.dateStart as string, querySchema.dateEnd as string]
-        : [];
+      const totalOrdersSql = `
+        SELECT COUNT(DISTINCT ${orderKeyExpr})::bigint AS total_orders
+        FROM l4k_model.joinsales_orderline j
+        ${where}
+      `;
+      const totalOrdersResult = await client.query(totalOrdersSql, params);
+      const distinctOrderTotal = Number(totalOrdersResult.rows[0]?.total_orders ?? 0);
 
-      const sql = `SELECT ${statusColumn} AS status, COUNT(*)::bigint AS cnt FROM l4k_model.joinsales_orderline ${where} GROUP BY 1`;
-      const result = await client.query(sql, params);
-      const rows = result.rows.map((r) => ({ status: String(r.status ?? ''), count: Number(r.cnt ?? 0) }));
+      const bucketLine = `CASE
+        WHEN LOWER(TRIM(CAST(j.${statusCol} AS TEXT))) IN ('complete', 'completed', 'saled', 'fulfilled') THEN 'complete'
+        WHEN LOWER(TRIM(CAST(j.${statusCol} AS TEXT))) IN ('cancel', 'cancelled', 'canceled') THEN 'cancel'
+        ELSE 'other'
+      END`;
+      const hypothesisSql = `
+        WITH base AS (
+          SELECT
+            ${orderKeyExpr} AS order_key,
+            ${bucketLine} AS bucket
+          FROM l4k_model.joinsales_orderline j
+          ${where}
+        ),
+        flags AS (
+          SELECT
+            order_key,
+            bool_or(bucket = 'complete') AS has_complete,
+            bool_or(bucket = 'cancel') AS has_cancel
+          FROM base
+          GROUP BY order_key
+        )
+        SELECT
+          COUNT(*) FILTER (WHERE has_cancel)::bigint AS cancel_wins,
+          COUNT(*) FILTER (WHERE NOT has_cancel AND has_complete)::bigint AS complete_only,
+          COUNT(*) FILTER (WHERE NOT has_cancel AND NOT has_complete)::bigint AS other_only
+        FROM flags
+      `;
+      const hypothesisResult = await client.query(hypothesisSql, params);
+      const hz = hypothesisResult.rows[0] ?? {};
+      const orderLevelHypothesis = {
+        cancelWins: Number(hz.cancel_wins ?? 0),
+        completeOnly: Number(hz.complete_only ?? 0),
+        otherOnly: Number(hz.other_only ?? 0)
+      };
+
+      const rows = result.rows.map((r) => ({
+        status: String(r.status ?? ''),
+        count: Number(r.cnt ?? 0),
+        distinctOrders: Number(r.order_cnt ?? 0)
+      }));
       const total = rows.reduce((acc, r) => acc + r.count, 0);
-      res.json({ data: { total, rows } });
+      res.json({ data: { total, distinctOrderTotal, orderLevelHypothesis, rows } });
     } finally {
       client.release();
     }
@@ -1584,7 +1724,9 @@ router.post('/orders/vs/pivot', async (req, res, next) => {
 
       const dateCol = quoteIdent(columns.date);
       const dateExpr = `j.${dateCol}`;
-      const params2: Array<string | string[]> = [stage.dateStart, stage.dateEnd];
+      const params2: Array<string | string[]> = [];
+      const dateRanges = normalizeDateRanges(stage.dateRanges ?? [], stage.dateStart, stage.dateEnd);
+      const datePredicate = buildDateRangesPredicate(dateExpr, params2, dateRanges);
 
       // Time grouping expression based on granularity
       const timeExpr = granularity === 'daily'
@@ -1609,7 +1751,8 @@ router.post('/orders/vs/pivot', async (req, res, next) => {
                 FROM l4k_model.customer_type GROUP BY TRIM(CAST("Title" AS TEXT))
               ) ct ON NULLIF(TRIM(CAST(j.${quoteIdent(columns.customer!)} AS TEXT)), '') = ct.title_key`
             : ''}
-          WHERE ${dateExpr}::date BETWEEN $1 AND $2
+          WHERE ${datePredicate || '1=1'}
+          ${vsExcludedCategoryWhereSql(columns)}
           ${(() => {
             const normalizedStatuses = normalizeVsStatuses(stage.statuses ?? []);
             if (normalizedStatuses.length > 0) {
@@ -1630,8 +1773,8 @@ router.post('/orders/vs/pivot', async (req, res, next) => {
           SELECT * FROM scoped2
           WHERE 1=1
           ${(() => {
-            const channels = (stage.channels ?? []).map(v => v.trim().toLowerCase()).filter(Boolean);
-            const categories = (stage.categories ?? []).map(v => v.trim().toLowerCase()).filter(Boolean);
+            const channels = (stage.channels ?? []).map((v: string) => v.trim().toLowerCase()).filter(Boolean);
+            const categories = (stage.categories ?? []).map((v: string) => v.trim().toLowerCase()).filter(Boolean);
             let extra = '';
             if (channels.length > 0) {
               params2.push(channels);
@@ -1655,7 +1798,7 @@ router.post('/orders/vs/pivot', async (req, res, next) => {
         GROUP BY 1, 2, 3
         ORDER BY 1, 2, 3`;
 
-      const result = await client.query(pivotSql, [stage.dateStart, stage.dateEnd, ...params2.slice(2)]);
+      const result = await client.query(pivotSql, params2);
 
       // Build structured pivot: { months, channels, data }
       const channelSet = new Set<string>();
@@ -1751,7 +1894,13 @@ router.get('/sku/raw', async (req, res, next) => {
           .string()
           .optional()
           .transform((v) => (v ? Number(v) : 50)),
-        q: z.string().optional()
+        q: z.string().optional(),
+        moveTypes: z
+          .string()
+          .optional()
+          .transform((v) =>
+            v ? v.split(',').map((x) => x.trim().toUpperCase()).filter(Boolean) : []
+          )
       })
       .parse(req.query);
 
@@ -1763,11 +1912,16 @@ router.get('/sku/raw', async (req, res, next) => {
     const pageSize = Math.min(Math.max(querySchema.pageSize ?? 50, 1), maxPageSize);
     const offset = (page - 1) * pageSize;
     const tableName = SKU_TABLES[querySchema.period];
+    const periodYear = querySchema.period === 'current' ? new Date().getFullYear() : new Date().getFullYear() - 1;
 
     const client = await getPool().connect();
     try {
       const sample = await client.query(`SELECT * FROM ${tableName} LIMIT 0`);
       const fieldNames = (sample.fields as FieldDef[]).map((f) => f.name);
+      const layout = detectMonthLayout(sample.fields as FieldDef[]);
+      const monthsSoldExpr = buildMonthsSoldExprFromLayout(layout, 't') ?? '0';
+      const rules = await loadConditionSkuRules(client, periodYear);
+      const moveTypeExpr = buildMoveTypeCaseExpr('months_sold', rules);
 
       const params: Array<string | number> = [];
       const filters: string[] = [];
@@ -1793,17 +1947,46 @@ router.get('/sku/raw', async (req, res, next) => {
       }
 
       const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-      const countSql = `SELECT COUNT(*)::bigint AS cnt FROM ${tableName} ${where}`;
-      const dataSql = `SELECT * FROM ${tableName} ${where} OFFSET $${params.length + 1} LIMIT $${params.length + 2}`;
+      const moveFilters: string[] = [];
+      if ((querySchema.moveTypes ?? []).length > 0) {
+        params.push(querySchema.moveTypes);
+        moveFilters.push(`move_type = ANY($${params.length}::text[])`);
+      }
+      const moveWhere = moveFilters.length ? `WHERE ${moveFilters.join(' AND ')}` : '';
+      const classifiedCte = `
+        WITH base AS (
+          SELECT t.*, (${monthsSoldExpr})::int AS months_sold
+          FROM ${tableName} t
+          ${where}
+        ),
+        classified AS (
+          SELECT base.*, ${moveTypeExpr} AS move_type
+          FROM base
+        )
+      `;
+      const countSql = `${classifiedCte} SELECT COUNT(*)::bigint AS cnt FROM classified ${moveWhere}`;
+      const dataSql = `${classifiedCte}
+        SELECT * FROM classified ${moveWhere}
+        OFFSET $${params.length + 1} LIMIT $${params.length + 2}`;
       const countResult = await client.query(countSql, params);
       const totalRecords = Number(countResult.rows[0]?.cnt ?? 0);
       const result = await client.query(dataSql, [...params, offset, pageSize]);
       const columns = (result.fields as FieldDef[]).map((f) => f.name);
+      const rows = result.rows.map((r) => ({
+        ...Object.fromEntries(
+          Object.entries(r).filter(([k]) => k !== 'move_type' && k !== 'months_sold')
+        ),
+        moveType: String(r.move_type ?? 'NM'),
+        monthsSold: Number(r.months_sold ?? 0)
+      }));
+      const responseColumns = Array.from(
+        new Set([...columns.filter((c) => c !== 'move_type' && c !== 'months_sold'), 'moveType', 'monthsSold'])
+      );
 
       res.json({
         data: {
-          columns,
-          rows: result.rows,
+          columns: responseColumns,
+          rows,
           page,
           pageSize,
           totalRecords,
@@ -1819,24 +2002,133 @@ router.get('/sku/raw', async (req, res, next) => {
 });
 
 // Product SKU monthly totals comparison (current year vs previous year)
-router.get('/sku/monthly-comparison', async (_req, res, next) => {
+router.get('/sku/monthly-comparison', async (req, res, next) => {
   try {
+    const querySchema = z
+      .object({
+        moveTypes: z
+          .string()
+          .optional()
+          .transform((v) =>
+            v ? v.split(',').map((x) => x.trim().toUpperCase()).filter(Boolean) : []
+          )
+      })
+      .parse(req.query);
     const client = await getPool().connect();
     try {
-      const [currentTotals, previousTotals] = await Promise.all([
-        loadMonthTotals(client, SKU_TABLES.current),
-        loadMonthTotals(client, SKU_TABLES.previous)
+      const currentYear = new Date().getFullYear();
+      const previousYear = currentYear - 1;
+      const [currentRules, previousRules] = await Promise.all([
+        loadConditionSkuRules(client, currentYear),
+        loadConditionSkuRules(client, previousYear)
       ]);
-      const [currentAmountSum, previousAmountSum] = await Promise.all([
-        sumAmountColumn(client, SKU_TABLES.current),
-        sumAmountColumn(client, SKU_TABLES.previous)
+      const moveFilter = querySchema.moveTypes ?? [];
+
+      async function loadSkuYearAggregates(
+        table: string,
+        rules: MoveRule[],
+        selectedMoveTypes: string[]
+      ) {
+        const sample = await client.query(`SELECT * FROM ${table} LIMIT 0`);
+        const fields = sample.fields as FieldDef[];
+        const layout = detectMonthLayout(fields);
+        if (!layout || layout.type !== 'columns') {
+          return {
+            months: [] as Array<{ monthIndex: number; label: string; quantity: number; amount: number }>,
+            moveSummary: { MF: 0, MM: 0, MS: 0, NM: 0 }
+          };
+        }
+        const monthsSoldExpr = buildMonthsSoldExprFromLayout(layout, 't') ?? '0';
+        const moveTypeExpr = buildMoveTypeCaseExpr('months_sold', rules);
+        const params: Array<string | string[]> = [];
+        const moveWhere = selectedMoveTypes.length > 0
+          ? (() => {
+              params.push(selectedMoveTypes);
+              return `WHERE move_type = ANY($${params.length}::text[])`;
+            })()
+          : '';
+        const monthQtyCols = layout.monthColumns.map((m) =>
+          m.qtyColumn
+            ? `COALESCE(SUM(CAST(${quoteIdent(m.qtyColumn)} AS numeric)), 0)::numeric AS ${quoteIdent(`qty_${m.monthIndex}`)}`
+            : `0::numeric AS ${quoteIdent(`qty_${m.monthIndex}`)}`
+        );
+        const monthAmtCols = layout.monthColumns.map((m) =>
+          m.amountColumn
+            ? `COALESCE(SUM(CAST(${quoteIdent(m.amountColumn)} AS numeric)), 0)::numeric AS ${quoteIdent(`amt_${m.monthIndex}`)}`
+            : `0::numeric AS ${quoteIdent(`amt_${m.monthIndex}`)}`
+        );
+        const totalAmountField = detectTotalAmountField(fields, layout);
+        const totalAmountSelect = totalAmountField
+          ? `, COALESCE(SUM(CAST(${quoteIdent(totalAmountField)} AS numeric)), 0)::numeric AS total_amount`
+          : '';
+        const aggregateSql = `
+          WITH base AS (
+            SELECT t.*, (${monthsSoldExpr})::int AS months_sold
+            FROM ${table} t
+          ),
+          classified AS (
+            SELECT base.*, ${moveTypeExpr} AS move_type
+            FROM base
+          )
+          SELECT ${[...monthQtyCols, ...monthAmtCols].join(', ')}
+            ${totalAmountSelect}
+          FROM classified
+          ${moveWhere}
+        `;
+        const aggResult = await client.query(aggregateSql, params);
+        const agg = aggResult.rows[0] ?? {};
+        const months = layout.monthColumns.map((m) => ({
+          monthIndex: m.monthIndex,
+          label: monthLabel(m.monthIndex),
+          quantity: Number(agg[`qty_${m.monthIndex}`] ?? 0),
+          amount: Number(agg[`amt_${m.monthIndex}`] ?? 0)
+        }));
+        const summarySql = `
+          WITH base AS (
+            SELECT t.*, (${monthsSoldExpr})::int AS months_sold
+            FROM ${table} t
+          ),
+          classified AS (
+            SELECT base.*, ${moveTypeExpr} AS move_type
+            FROM base
+          )
+          SELECT move_type, COUNT(*)::int AS cnt
+          FROM classified
+          ${moveWhere}
+          GROUP BY move_type
+        `;
+        const summaryResult = await client.query(summarySql, params);
+        const moveSummary = { MF: 0, MM: 0, MS: 0, NM: 0 };
+        for (const row of summaryResult.rows) {
+          const key = String(row.move_type ?? '').toUpperCase();
+          if (key in moveSummary) (moveSummary as Record<string, number>)[key] = Number(row.cnt ?? 0);
+        }
+        const amountTotal = Number(agg.total_amount ?? 0);
+        return { months, moveSummary, amountTotal };
+      }
+
+      const [currentAgg, previousAgg] = await Promise.all([
+        loadSkuYearAggregates(SKU_TABLES.current, currentRules, moveFilter),
+        loadSkuYearAggregates(SKU_TABLES.previous, previousRules, moveFilter)
       ]);
+      const currentTotals = currentAgg.months;
+      const previousTotals = previousAgg.months;
+      const currentAmountSum = Number.isFinite(currentAgg.amountTotal)
+        ? currentAgg.amountTotal
+        : currentTotals.reduce((a, b) => a + (b.amount ?? 0), 0);
+      const previousAmountSum = Number.isFinite(previousAgg.amountTotal)
+        ? previousAgg.amountTotal
+        : previousTotals.reduce((a, b) => a + (b.amount ?? 0), 0);
       const months = mergeMonthTotals(currentTotals, previousTotals);
       res.json({
         data: {
           months,
-          currentYear: new Date().getFullYear(),
-          previousYear: new Date().getFullYear() - 1,
+          currentYear,
+          previousYear,
+          moveSummary: {
+            current: currentAgg.moveSummary,
+            previous: previousAgg.moveSummary
+          },
           amountTotals: {
             currentAmount: currentAmountSum ?? currentTotals.reduce((a, b) => a + (b.amount ?? 0), 0),
             previousAmount: previousAmountSum ?? previousTotals.reduce((a, b) => a + (b.amount ?? 0), 0)

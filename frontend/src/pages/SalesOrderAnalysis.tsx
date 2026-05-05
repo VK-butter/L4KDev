@@ -5,6 +5,7 @@ import {
   analyticsSummaryApi,
   analyticsStatusApi,
   analyticsSalesTargetApi,
+  type DateRangeInput,
   type RawOrdersPage,
   type SalesTargetCompareResponse
 } from '../services/analyticsApi';
@@ -23,8 +24,36 @@ type ApiErrorResponse = {
 type PieClickPayload = {
   name?: string;
 };
+type LocalDateRange = { start: string; end: string };
 
 function toIso(d: Date) { return d.toISOString().slice(0, 10); }
+
+function normalizeDateRanges(ranges: LocalDateRange[]): DateRangeInput[] {
+  const valid = ranges
+    .filter((r) => r.start && r.end)
+    .map((r) => (r.start <= r.end ? r : { start: r.end, end: r.start }))
+    .sort((a, b) => a.start.localeCompare(b.start));
+  const merged: DateRangeInput[] = [];
+  for (const r of valid) {
+    const prev = merged[merged.length - 1];
+    if (!prev) {
+      merged.push({ ...r });
+      continue;
+    }
+    const prevEnd = new Date(prev.end);
+    prevEnd.setDate(prevEnd.getDate() + 1);
+    if (new Date(r.start) <= prevEnd) {
+      if (r.end > prev.end) prev.end = r.end;
+      continue;
+    }
+    merged.push({ ...r });
+  }
+  return merged;
+}
+
+function summarizeRanges(ranges: DateRangeInput[]) {
+  return ranges.map((r) => (r.start === r.end ? r.start : `${r.start} – ${r.end}`));
+}
 
 function fmtRev(value: number) {
   if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
@@ -80,23 +109,40 @@ function MetricBox({ label, value, displayValue, icon, color, hint }: {
 }
 
 export function SalesOrderAnalysis() {
-  const [dateStart, setDateStart] = useState<string>('');
-  const [dateEnd, setDateEnd] = useState<string>('');
+  const [multiRanges, setMultiRanges] = useState<LocalDateRange[]>([{ start: '', end: '' }]);
   const [data, setData] = useState<RawOrdersPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [summary, setSummary] = useState<{ totalRecords: number; totalRevenue?: number; totalQuantity?: number } | null>(null);
-  const [statusBreakdown, setStatusBreakdown] = useState<{ saled: number; cancel: number; total: number }>({ saled: 0, cancel: 0, total: 0 });
+  const [statusBreakdown, setStatusBreakdown] = useState<{
+    saled: number;
+    cancel: number;
+    ordersCompleteHypothesis: number;
+    ordersCancelHypothesis: number;
+    ordersOtherHypothesis: number;
+    total: number;
+    distinctOrderTotal: number;
+  }>({
+    saled: 0,
+    cancel: 0,
+    ordersCompleteHypothesis: 0,
+    ordersCancelHypothesis: 0,
+    ordersOtherHypothesis: 0,
+    total: 0,
+    distinctOrderTotal: 0
+  });
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [targetData, setTargetData] = useState<SalesTargetCompareResponse | null>(null);
   const fallbackTargetStart = toIso(new Date(new Date().getFullYear(), 0, 1));
   const fallbackTargetEnd = toIso(new Date());
-  const effectiveTargetStart = dateStart || fallbackTargetStart;
-  const effectiveTargetEnd = dateEnd || fallbackTargetEnd;
+  const normalizedRanges = normalizeDateRanges(multiRanges);
+  const activeDateRanges = normalizedRanges;
+  const effectiveTargetStart = normalizedRanges[0]?.start ?? fallbackTargetStart;
+  const effectiveTargetEnd = normalizedRanges[normalizedRanges.length - 1]?.end ?? fallbackTargetEnd;
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -115,27 +161,26 @@ export function SalesOrderAnalysis() {
       setLoading(true);
       setError(null);
       try {
+        const dateParams = { dateRanges: activeDateRanges.length > 0 ? activeDateRanges : undefined };
         const [sum, st, res, tgt] = await Promise.all([
           analyticsSummaryApi.rawSummary({
-            dateStart: dateStart || undefined,
-            dateEnd: dateEnd || undefined,
+            ...dateParams,
             status: statusFilter || undefined
           }),
           analyticsStatusApi.rawStatus({
-            dateStart: dateStart || undefined,
-            dateEnd: dateEnd || undefined
+            ...dateParams
           }),
           analyticsApi.rawOrders({
             page,
             pageSize,
-            dateStart: dateStart || undefined,
-            dateEnd: dateEnd || undefined,
+            ...dateParams,
             status: statusFilter || undefined,
             q: debouncedSearch || undefined
           }),
           analyticsSalesTargetApi.compareSalesTarget({
             dateStart: effectiveTargetStart,
             dateEnd: effectiveTargetEnd,
+            dateRanges: activeDateRanges,
             statuses: statusFilter ? [statusFilter] : [],
             channels: [],
             categories: []
@@ -146,6 +191,7 @@ export function SalesOrderAnalysis() {
         if (!ignore) {
           const rows = st.data.data.rows || [];
           const total = st.data.data.total || 0;
+          const distinctOrderTotal = Number(st.data.data.distinctOrderTotal ?? 0);
           const complete = rows
             .filter((r) => {
               const s = String(r.status).toLowerCase();
@@ -155,7 +201,16 @@ export function SalesOrderAnalysis() {
           const cancel = rows
             .filter((r) => String(r.status).toLowerCase() === 'cancel')
             .reduce((a, b) => a + b.count, 0);
-          setStatusBreakdown({ saled: complete, cancel, total });
+          const h = st.data.data.orderLevelHypothesis;
+          setStatusBreakdown({
+            saled: complete,
+            cancel,
+            ordersCompleteHypothesis: h?.completeOnly ?? 0,
+            ordersCancelHypothesis: h?.cancelWins ?? 0,
+            ordersOtherHypothesis: h?.otherOnly ?? 0,
+            total,
+            distinctOrderTotal
+          });
         }
         if (!ignore) setData(res.data.data);
       } catch (e) {
@@ -177,29 +232,43 @@ export function SalesOrderAnalysis() {
     return () => {
       ignore = true;
     };
-  }, [page, pageSize, dateStart, dateEnd, statusFilter, debouncedSearch]);
+  }, [page, pageSize, activeDateRanges, effectiveTargetStart, effectiveTargetEnd, statusFilter, debouncedSearch]);
 
   function setDaily() {
     const d = new Date();
     const yesterday = new Date(d);
     yesterday.setDate(d.getDate() - 1);
-    setDateStart(toIso(yesterday));
-    setDateEnd(toIso(d));
+    setMultiRanges([{ start: toIso(yesterday), end: toIso(d) }]);
     setPage(1);
   }
 
   function setYTD() {
     const d = new Date();
     const start = new Date(d.getFullYear(), 0, 1);
-    setDateStart(toIso(start));
-    setDateEnd(toIso(d));
+    setMultiRanges([{ start: toIso(start), end: toIso(d) }]);
     setPage(1);
   }
 
   function clearDates() {
-    setDateStart('');
-    setDateEnd('');
+    setMultiRanges([{ start: '', end: '' }]);
     setStatusFilter(undefined);
+    setPage(1);
+  }
+
+  function addRangeRow() {
+    setMultiRanges((prev) => [...prev, { start: '', end: '' }]);
+  }
+
+  function updateRangeRow(index: number, patch: Partial<LocalDateRange>) {
+    setMultiRanges((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+    setPage(1);
+  }
+
+  function removeRangeRow(index: number) {
+    setMultiRanges((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [{ start: '', end: '' }];
+    });
     setPage(1);
   }
 
@@ -224,14 +293,13 @@ export function SalesOrderAnalysis() {
 
   async function exportAllToExcel() {
     const pageSize = 500;
-    const start = dateStart || undefined;
-    const end = dateEnd || undefined;
+    const dateParams = { dateRanges: activeDateRanges.length > 0 ? activeDateRanges : undefined };
 
     let columns = data?.columns ?? [];
     let totalRecords = summary?.totalRecords;
     if (!totalRecords || totalRecords < 0) {
       try {
-        const s = await analyticsSummaryApi.rawSummary({ dateStart: start, dateEnd: end, status: statusFilter || undefined });
+        const s = await analyticsSummaryApi.rawSummary({ ...dateParams, status: statusFilter || undefined });
         totalRecords = s.data.data.totalRecords;
       } catch {
         totalRecords = data?.totalRecords ?? 0;
@@ -239,7 +307,7 @@ export function SalesOrderAnalysis() {
     }
 
     if (!columns.length) {
-      const one = await analyticsApi.rawOrders({ page: 1, pageSize: 1, dateStart: start, dateEnd: end, status: statusFilter || undefined, q: debouncedSearch || undefined });
+      const one = await analyticsApi.rawOrders({ page: 1, pageSize: 1, ...dateParams, status: statusFilter || undefined, q: debouncedSearch || undefined });
       columns = one.data.data.columns;
     }
 
@@ -248,7 +316,7 @@ export function SalesOrderAnalysis() {
     const allRows: string[] = [];
 
     for (let p = 1; p <= totalPages; p++) {
-      const res = await analyticsApi.rawOrders({ page: p, pageSize, dateStart: start, dateEnd: end, status: statusFilter || undefined, q: debouncedSearch || undefined });
+      const res = await analyticsApi.rawOrders({ page: p, pageSize, ...dateParams, status: statusFilter || undefined, q: debouncedSearch || undefined });
       const rows = res.data.data.rows.map((row) =>
         columns
           .map((c) => {
@@ -263,8 +331,8 @@ export function SalesOrderAnalysis() {
     }
 
     const csv = [header, ...allRows].join('\n');
-    const fnameStart = dateStart || 'all';
-    const fnameEnd = dateEnd || 'all';
+    const fnameStart = activeDateRanges[0]?.start ?? 'all';
+    const fnameEnd = activeDateRanges[activeDateRanges.length - 1]?.end ?? 'all';
     const file = `sale_order_lines_${fnameStart}_to_${fnameEnd}_all.csv`;
     downloadBlob(csv, file, 'text/csv;charset=utf-8;');
   }
@@ -290,6 +358,75 @@ export function SalesOrderAnalysis() {
         </p>
       </header>
 
+      {/* ── Filters ──────────────────────────────── */}
+      <section
+        className="panel panel-wash border-l-4 border-emerald-400 dark:border-emerald-600 space-y-3"
+      >
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Filters</h2>
+          <div className="ml-auto flex gap-1">
+            {[
+              { key: 'daily', fn: setDaily },
+              { key: 'ytd', fn: setYTD },
+              { key: 'all', fn: clearDates }
+            ].map((p) => (
+              <button key={p.key} type="button" onClick={p.fn}
+                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 hover:bg-white/80 hover:text-emerald-900 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 transition-all duration-150">
+                {p.key}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {multiRanges.map((range, idx) => (
+            <div key={`r-${idx}`} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+              <input
+                type="date"
+                value={range.start}
+                onChange={(e) => updateRangeRow(idx, { start: e.target.value })}
+                className="input py-1.5 text-xs"
+              />
+              <input
+                type="date"
+                value={range.end}
+                onChange={(e) => updateRangeRow(idx, { end: e.target.value })}
+                className="input py-1.5 text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => removeRangeRow(idx)}
+                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-rose-500 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20"
+              >
+                ลบ
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={addRangeRow}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-white/80 hover:text-emerald-900 dark:text-emerald-300 dark:hover:bg-white/[0.06]"
+            >
+              + เพิ่มช่วง
+            </button>
+            <p className="text-[11px] text-gray-500 dark:text-emerald-500/90">
+              โหมดเดียว: เพิ่มได้หลายช่วงวัน (รวมช่วงเดียวได้)
+            </p>
+          </div>
+          {activeDateRanges.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {summarizeRanges(activeDateRanges).map((label) => (
+                <span key={label} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* ── KPI Cards ────────────────────────────── */}
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricBox label="ยอดขายจริง" displayValue={`฿${fmtRev(achieved)}`} icon={RevenueIcon}
@@ -298,10 +435,11 @@ export function SalesOrderAnalysis() {
           label="เป้ายอดขาย"
           displayValue={priceTarget > 0 ? `฿${fmtRev(priceTarget)}` : '—'}
           icon={TargetIcon}
-          hint={`Target range: ${effectiveTargetStart} to ${effectiveTargetEnd}`}
+          hint={`เป้ารายเดือนในช่วง ${effectiveTargetStart} – ${effectiveTargetEnd} รวมกัน`}
           color="bg-cyan-100 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300"
         />
         <MetricBox label="จำนวน (Qty)" value={achievedQty} icon={QtyIcon}
+          hint="รวมจำนวนชิ้นทั้งหมด — ไม่เกี่ยวกับการบวกเลขออเดอร์ด้านล่าง"
           color="bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" />
         <MetricBox label="% Achievement" displayValue={achievementPct != null ? `${achievementPct.toFixed(1)}%` : '—'} icon={OrdersIcon}
           color={achievementPct != null && achievementPct >= 100
@@ -314,7 +452,7 @@ export function SalesOrderAnalysis() {
         <section className="panel">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-cyan-700 dark:text-cyan-300">ยอดขายจริง vs เป้ายอดขาย</p>
           <p className="mt-1 text-xs text-gray-500 dark:text-emerald-500">
-            Target range: {effectiveTargetStart} to {effectiveTargetEnd} (monthly target)
+            <strong>เป้ารายเดือน</strong>ของทุกเดือนในช่วง <strong>{effectiveTargetStart}</strong> – <strong>{effectiveTargetEnd}</strong> รวมกัน
           </p>
           <div className="mt-3 flex items-end justify-between">
             <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">฿{achieved.toLocaleString()}</p>
@@ -336,7 +474,13 @@ export function SalesOrderAnalysis() {
       {/* ── Status Breakdown ─────────────────────── */}
       <section className="panel">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Status Breakdown</h2>
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Status Breakdown</h2>
+            <p className="mt-1 max-w-2xl text-[11px] leading-snug text-gray-500 dark:text-emerald-500/90">
+              <strong>การ์ด</strong> นับเป็นออเดอร์: มียกเลิกอย่างน้อย 1 บรรทัด → ทั้งใบเป็น Cancel · ไม่มียกเลิกและขายสำเร็จอย่างน้อย 1 บรรทัด → Complete · รวมกับ &quot;อื่น ๆ&quot; เท่ากับออเดอร์ทั้งหมด —{' '}
+              <strong>กราฟ</strong> แสดงสัดส่วนตามบรรทัด (ไม่ใช่ตามออเดอร์)
+            </p>
+          </div>
           {statusFilter && (
             <button
               type="button"
@@ -348,9 +492,9 @@ export function SalesOrderAnalysis() {
           )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 items-center">
+        <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
           {/* Donut Pie */}
-          <div className="mx-auto w-full flex justify-center">
+          <div className="mx-auto flex w-full justify-center lg:col-span-5">
             {(() => {
               const chartData = [
                 { name: 'Complete', value: statusBreakdown.saled, color: brandPalette.accent[500], grad: 'teal' },
@@ -401,17 +545,15 @@ export function SalesOrderAnalysis() {
                       </Pie>
                       <Tooltip
                         contentStyle={{ borderRadius: 12, border: '1px solid rgba(16,185,129,0.2)', fontSize: 13, backgroundColor: 'var(--app-surface)', color: 'var(--app-text)' }}
-                        formatter={(value: number, name: string) => [
-                          value.toLocaleString(),
-                          name
-                        ]}
+                        formatter={(value: number, name: string) => [`${value.toLocaleString()} บรรทัด`, name]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-400 dark:text-emerald-500">Total</p>
-                      <p className="text-xl font-bold text-gray-900 dark:text-white">{statusTotal.toLocaleString()}</p>
+                    <div className="text-center px-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-emerald-500">บรรทัดรวม</p>
+                      <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white">{statusTotal.toLocaleString()}</p>
+                      <p className="mt-0.5 text-[9px] text-gray-400 dark:text-emerald-500/90">ตามกราฟ</p>
                     </div>
                   </div>
                 </div>
@@ -419,82 +561,92 @@ export function SalesOrderAnalysis() {
             })()}
           </div>
 
-          {/* Info Cards */}
-          <div className="grid gap-3">
-            {[
-              {
-                label: 'Complete',
-                key: 'Complete',
-                color: brandPalette.accent[500],
-                value: statusBreakdown.saled,
-                pct: statusTotal > 0 ? Math.round((statusBreakdown.saled / statusTotal) * 1000) / 10 : 0
-              },
-              {
-                label: 'Cancel',
-                key: 'Cancel',
-                color: brandPalette.danger[500],
-                value: statusBreakdown.cancel,
-                pct: statusTotal > 0 ? Math.round((statusBreakdown.cancel / statusTotal) * 1000) / 10 : 0
-              }
-            ].map((it) => (
-              <button
-                key={it.key}
-                type="button"
-                onClick={() => handleStatusSelect(it.label)}
-                className={`text-left rounded-xl border p-3 transition-all duration-150 ${
-                  statusFilter === it.label
-                    ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-900/40'
-                    : 'border-emerald-100 bg-white hover:bg-emerald-50 dark:border-white/[0.06] dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: it.color }} />
-                    <span className="font-semibold text-gray-900 dark:text-white">{it.label}</span>
+          {/* Total orders + status cards */}
+          <div className="flex flex-col gap-3 lg:col-span-7">
+            <div
+              className="rounded-xl border border-cyan-100/90 bg-white px-4 py-3.5 dark:border-white/[0.08] dark:bg-white/[0.03]"
+              role="region"
+              aria-label="จำนวนออเดอร์ทั้งหมด"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+                ออเดอร์ทั้งหมด
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+                {statusBreakdown.distinctOrderTotal.toLocaleString()}
+              </p>
+              <p className="mt-1.5 text-[10px] leading-snug text-gray-500 dark:text-emerald-500/90">
+                หนึ่งออเดอร์หลายบรรทัด = นับ 1 ใบ
+              </p>
+              {statusBreakdown.ordersOtherHypothesis > 0 && (
+                <p className="mt-2 text-[10px] leading-snug text-amber-700/90 dark:text-amber-400/90">
+                  อีก {statusBreakdown.ordersOtherHypothesis.toLocaleString()} ใบ = สถานะอื่น (ไม่ใช่ Complete/Cancel)
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                {
+                  label: 'Complete',
+                  key: 'Complete',
+                  color: brandPalette.accent[500],
+                  orders: statusBreakdown.ordersCompleteHypothesis,
+                  orderPct:
+                    statusBreakdown.distinctOrderTotal > 0
+                      ? Math.round(
+                          (statusBreakdown.ordersCompleteHypothesis / statusBreakdown.distinctOrderTotal) * 1000
+                        ) / 10
+                      : 0,
+                  lines: statusBreakdown.saled,
+                  linePct: statusTotal > 0 ? Math.round((statusBreakdown.saled / statusTotal) * 1000) / 10 : 0,
+                  description: 'ไม่มียกเลิก และขายสำเร็จอย่างน้อย 1 บรรทัด'
+                },
+                {
+                  label: 'Cancel',
+                  key: 'Cancel',
+                  color: brandPalette.danger[500],
+                  orders: statusBreakdown.ordersCancelHypothesis,
+                  orderPct:
+                    statusBreakdown.distinctOrderTotal > 0
+                      ? Math.round(
+                          (statusBreakdown.ordersCancelHypothesis / statusBreakdown.distinctOrderTotal) * 1000
+                        ) / 10
+                      : 0,
+                  lines: statusBreakdown.cancel,
+                  linePct: statusTotal > 0 ? Math.round((statusBreakdown.cancel / statusTotal) * 1000) / 10 : 0,
+                  description: 'มียกเลิกอย่างน้อย 1 บรรทัด → นับ Cancel ทั้งใบ'
+                }
+              ].map((it) => (
+                <button
+                  key={it.key}
+                  type="button"
+                  onClick={() => handleStatusSelect(it.label)}
+                  className={`min-h-[44px] text-left rounded-xl border p-3 transition-all duration-150 ${
+                    statusFilter === it.label
+                      ? 'border-emerald-400 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-900/40'
+                      : 'border-emerald-100 bg-white hover:bg-emerald-50 dark:border-white/[0.06] dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: it.color }} />
+                      <span className="font-semibold text-gray-900 dark:text-white">{it.label}</span>
+                    </div>
+                    <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900 dark:text-white">
+                      {it.orders.toLocaleString()} <span className="text-[11px] font-normal text-gray-500 dark:text-emerald-500">ออเดอร์</span>
+                    </span>
                   </div>
-                  <span className="font-bold text-gray-700 dark:text-white tabular-nums">{it.value.toLocaleString()}</span>
-                </div>
-                <div className="mt-1 text-xs text-gray-400 dark:text-emerald-500">{it.pct}% of total</div>
-              </button>
-            ))}
+                  <div className="mt-1 text-xs text-gray-400 dark:text-emerald-500">
+                    บรรทัด {it.lines.toLocaleString()} · กราฟ {it.linePct}%
+                    <span className="block text-[10px] text-gray-500 dark:text-emerald-500/80">
+                      {it.orderPct}% ของออเดอร์ทั้งหมด
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[10px] leading-snug text-gray-500 dark:text-emerald-500/80">{it.description}</p>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
-
-      {/* ── Filters ──────────────────────────────── */}
-      <section
-        className="panel panel-wash border-l-4 border-emerald-400 dark:border-emerald-600 space-y-3"
-      >
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Filters</h2>
-          <div className="ml-auto flex gap-1">
-            {[
-              { key: 'daily', fn: setDaily },
-              { key: 'ytd', fn: setYTD },
-              { key: 'all', fn: clearDates }
-            ].map((p) => (
-              <button key={p.key} type="button" onClick={p.fn}
-                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-700 hover:bg-white/80 hover:text-emerald-900 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 transition-all duration-150">
-                {p.key}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <input
-            type="date"
-            value={dateStart}
-            onChange={(e) => { setDateStart(e.target.value); setPage(1); }}
-            className="input py-1.5 text-xs"
-          />
-          <input
-            type="date"
-            value={dateEnd}
-            onChange={(e) => { setDateEnd(e.target.value); setPage(1); }}
-            className="input py-1.5 text-xs"
-          />
         </div>
       </section>
 

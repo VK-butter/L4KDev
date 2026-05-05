@@ -10,7 +10,8 @@
     "lint": "eslint --ext .ts --ignore-pattern \"**/*.d.ts\" src",
     "test": "vitest run",
     "format": "prettier --write \"src/**/*.ts\"",
-    "seed:mocks": "tsx src/data/mocks/seedOrders.ts"
+    "seed:mocks": "tsx src/data/mocks/seedOrders.ts",
+    "check:mixed-order-status": "tsx scripts/checkMixedOrderStatus.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

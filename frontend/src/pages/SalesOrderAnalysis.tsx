@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import {
   analyticsApi,
@@ -139,7 +139,7 @@ export function SalesOrderAnalysis() {
   const [targetData, setTargetData] = useState<SalesTargetCompareResponse | null>(null);
   const fallbackTargetStart = toIso(new Date(new Date().getFullYear(), 0, 1));
   const fallbackTargetEnd = toIso(new Date());
-  const normalizedRanges = normalizeDateRanges(multiRanges);
+  const normalizedRanges = useMemo(() => normalizeDateRanges(multiRanges), [multiRanges]);
   const activeDateRanges = normalizedRanges;
   const effectiveTargetStart = normalizedRanges[0]?.start ?? fallbackTargetStart;
   const effectiveTargetEnd = normalizedRanges[normalizedRanges.length - 1]?.end ?? fallbackTargetEnd;
